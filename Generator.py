@@ -22,21 +22,20 @@ def load_words_from_file(filename):
 word_list = load_words_from_file("Words.txt")
 
 initial_grid = [
-    [" # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # "],
-    [" # ", " # ", " # ", " 1 ", " 2 ", " 3 ", " # ", " # ", " # ", " 4 ", " 5 ", " 6 ", " # ", " # ", " # "],
-    [" # ", " # ", " 7 ", "   ", "   ", "   ", " 8 ", " # ", " 9 ", "   ", "   ", "   ", "10 ", " # ", " # "],
-    [" # ", " # ", "11 ", "   ", "   ", "   ", "   ", " # ", "12 ", "   ", "   ", "   ", "   ", " # ", " # "],
-    [" # ", "13 ", "   ", "   ", " # ", "14 ", "   ", "15 ", "   ", "   ", " # ", "16 ", "   ", "17 ", " # "],
-    [" # ", "18 ", "   ", "   ", "19 ", " # ", "20 ", "   ", "   ", " # ", "21 ", "   ", "   ", "   ", " # "],
-    [" # ", "22 ", "   ", "   ", "   ", " # ", "23 ", "   ", "   ", " # ", "24 ", "   ", "   ", "   ", " # "],
-    [" # ", " # ", "25 ", "   ", "   ", "26 ", " # ", " # ", " # ", "27 ", "   ", "   ", "   ", " # ", " # "],
-    [" # ", " # ", " # ", "28 ", "   ", "   ", "29 ", " # ", "30 ", "   ", "   ", "   ", " # ", " # ", " # "],
-    [" # ", " # ", " # ", " # ", "31 ", "   ", "   ", "32 ", "   ", "   ", "   ", " # ", " # ", " # ", " # "],
-    [" # ", " # ", " # ", " # ", " # ", "33 ", "   ", "   ", "   ", "   ", " # ", " # ", " # ", " # ", " # "],
-    [" # ", " # ", " # ", " # ", " # ", " # ", " N ", " T ", " H ", " # ", " # ", " # ", " # ", " # ", " # "],
-    [" # ", " # ", " # ", " # ", " # ", " # ", " # ", "   ", " # ", " # ", " # ", " # ", " # ", " # ", " # "],
-    [" # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # "],
-]
+    [" # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # "],
+    [" # ", " # ", " # ", " 1 ", "   ", "   ", "   ", "   ", "   ", " 2 ", " # ", " # ", " # ", " # "],
+    [" # ", " # ", " # ", "   ", " # ", " # ", " # ", " # ", " # ", "   ", " # ", " # ", " 3 ", " # "],
+    [" # ", " # ", " # ", "   ", " # ", " # ", " # ", " # ", " # ", "   ", " # ", " # ", "   ", " # "],
+    [" # ", " # ", " # ", "   ", " # ", " # ", " 4 ", "   ", " 5 ", "   ", "   ", " # ", "   ", " # "],
+    [" # ", " # ", " # ", "   ", " # ", " # ", " # ", " # ", "   ", " # ", " # ", " # ", "   ", " # "],
+    [" # ", " # ", " # ", " # ", " # ", " 6 ", " # ", " # ", " 7 ", "   ", " 8 ", "   ", "   ", " # "],
+    [" # ", " # ", " # ", " # ", " # ", "   ", " # ", " # ", "   ", " # ", "   ", " # ", "   ", " # "],
+    [" # ", " # ", " 9 ", " # ", "10 ", "   ", "   ", "   ", "   ", " # ", "   ", " # ", " # ", " # "],
+    [" # ", " # ", "   ", " # ", " # ", "   ", " # ", " # ", "   ", " # ", "   ", " # ", " # ", " # "],
+    [" # ", "11 ", "   ", "   ", "   ", "   ", "   ", " # ", " # ", " # ", "   ", " # ", " # ", " # "],
+    [" # ", " # ", "   ", " # ", " # ", "   ", " # ", " # ", " # ", " # ", "   ", " # ", " # ", " # "],
+    [" # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # "]
+    ]
 
 def generate_slots(grid):
     """Generate slots for across and down words based on the grid layout."""
@@ -303,18 +302,20 @@ def display_solution(grid, solution, slots):
         for (row, col), letter in zip(positions, word):
             filled_grid[row][col] = f" {letter} "
 
-    # Display the grid with cell borders and side bars
+    # Display the grid with cell borders and replace "#" with spaces
     for row in filled_grid:
-        print("+---" * len(row) + "+")  # Top border for each row
-        print("|" + "|".join(row) + "|")  # Row content with side borders
+        display_row = ["   " if cell == " # " else cell for cell in row]  # Replace "#" with space
+        print("+---" * len(display_row) + "+")  # Top border for each row
+        print("|" + "|".join(display_row) + "|")  # Row content with side borders
     print("+---" * len(filled_grid[0]) + "+")  # Bottom border for the last row
 
 if __name__ == "__main__":
-    # Display the initial puzzle layout
+    # Display the initial puzzle layout with hashtags replaced by spaces
     print("Initial Puzzle:")
     for row in initial_grid:
-        print("+---" * len(row) + "+")  # Top border for each row
-        print("|" + "|".join(row) + "|")  # Row content with side borders
+        display_row = ["   " if cell == " # " else cell for cell in row]  # Replace "#" with space
+        print("+---" * len(display_row) + "+")  # Top border for each row
+        print("|" + "|".join(display_row) + "|")  # Row content with side borders
     print("+---" * len(initial_grid[0]) + "+")  # Bottom border for the last row
 
     # Solve the crossword puzzle
