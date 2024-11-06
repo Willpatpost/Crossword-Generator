@@ -38,32 +38,34 @@ def load_words_from_file(filename):
     return words
 
 def generate_slots(grid):
-    """Generate slots for across and down words based on the grid layout."""
+    """Generate slots for across and down words based on the grid layout, treating letter hints as part of slots."""
     slots = {}
     slot_id = 1
     rows = len(grid)
     cols = len(grid[0])
     cell_contents = {}
 
+    # Identify cells with pre-filled letters and store them
     for r in range(rows):
         for c in range(cols):
             cell = grid[r][c].strip()
-            if cell not in ("", "#"):
-                if re.match(r"^[A-Z]$", cell):
-                    cell_contents[(r, c)] = cell
-                else:
-                    cell_contents[(r, c)] = None
+            if re.match(r"^[A-Z]$", cell):  # Letter hints in grid
+                cell_contents[(r, c)] = cell
+            elif cell not in ("", "#"):
+                cell_contents[(r, c)] = None
 
+    # Generate across slots
     for r in range(rows):
         c = 0
         while c < cols:
             cell = grid[r][c].strip()
-            if cell != "#" and not re.match(r"^[A-Z]$", cell):
-                if c == 0 or grid[r][c-1].strip() == "#" or re.match(r"^[A-Z]$", grid[r][c-1].strip()):
+            if cell != "#":
+                # Start a new slot if at the beginning or after a black cell
+                if c == 0 or grid[r][c-1].strip() == "#":
                     slot_length = 0
                     positions = []
                     slot_number = cell if re.match(r"^\d+$", cell) else None
-                    while c < cols and grid[r][c].strip() != "#" and not re.match(r"^[A-Z]$", grid[r][c].strip()):
+                    while c < cols and grid[r][c].strip() != "#":
                         positions.append((r, c))
                         slot_length += 1
                         c += 1
@@ -71,18 +73,21 @@ def generate_slots(grid):
                         slot_name = f"{slot_number}ACROSS" if slot_number else f"{slot_id}ACROSS"
                         slots[slot_name] = positions
                         slot_id += 1
-            c += 1
+            else:
+                c += 1
 
+    # Generate down slots
     for c in range(cols):
         r = 0
         while r < rows:
             cell = grid[r][c].strip()
-            if cell != "#" and not re.match(r"^[A-Z]$", cell):
-                if r == 0 or grid[r-1][c].strip() == "#" or re.match(r"^[A-Z]$", grid[r-1][c].strip()):
+            if cell != "#":
+                # Start a new slot if at the beginning or after a black cell
+                if r == 0 or grid[r-1][c].strip() == "#":
                     slot_length = 0
                     positions = []
                     slot_number = cell if re.match(r"^\d+$", cell) else None
-                    while r < rows and grid[r][c].strip() != "#" and not re.match(r"^[A-Z]$", grid[r][c].strip()):
+                    while r < rows and grid[r][c].strip() != "#":
                         positions.append((r, c))
                         slot_length += 1
                         r += 1
@@ -90,19 +95,20 @@ def generate_slots(grid):
                         slot_name = f"{slot_number}DOWN" if slot_number else f"{slot_id}DOWN"
                         slots[slot_name] = positions
                         slot_id += 1
-            r += 1
+            else:
+                r += 1
 
     return slots, cell_contents
 
 def generate_crossword_variables(slots, cell_contents):
-    """Generate crossword variables with word lengths and pre-filled letters for each slot."""
+    """Generate crossword variables with word lengths and pre-filled letters for each slot, respecting hints."""
     crossword_variables = {}
     for slot, positions in slots.items():
         length = len(positions)
         pre_filled = {}
         for idx, (row, col) in enumerate(positions):
             if (row, col) in cell_contents and cell_contents[(row, col)]:
-                pre_filled[idx] = cell_contents[(row, col)]
+                pre_filled[idx] = cell_contents[(row, col)]  # Store the hint letter as a pre-filled constraint
         crossword_variables[slot] = {"length": length, "pre_filled": pre_filled}
     return crossword_variables
 
@@ -268,6 +274,9 @@ if __name__ == "__main__":
         print("|" + "|".join(display_row) + "|")  # Row content with side borders
     print("+---" * len(initial_grid[0]) + "+")  # Bottom border for the last row
 
+    # Start timing from this point
+    start_time = time.time()
+    
     # Load the word list
     word_list = load_words_from_file("Words.txt")
 
@@ -279,8 +288,14 @@ if __name__ == "__main__":
     # Solve the crossword puzzle
     solution = solve_crossword(crossword_variables, slots, word_list, constraints, randomize=True)
 
+    # End timing right after finding the solution
+    end_time = time.time()
+    
+    # Display timing results and solution
+    print(f"\nTime taken: {end_time - start_time:.4f} seconds")
+    
     if solution:
-        print("\nSolution Found:")
+        print("Solution:")
         for var, word in sorted(solution.items()):
             print(f"{var}: {word}")
         print("\nFilled Puzzle:")
