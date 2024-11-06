@@ -3,6 +3,25 @@ import re
 import random
 from collections import defaultdict
 
+# Initial grid for the larger puzzle
+initial_grid = [
+    [" # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # "],
+    [" # ", " # ", " # ", " 1 ", " 2 ", " 3 ", " # ", " # ", " # ", " 4 ", " 5 ", " 6 ", " # ", " # ", " # "],
+    [" # ", " # ", " 7 ", "   ", "   ", "   ", " 8 ", " # ", " 9 ", "   ", "   ", "   ", "10 ", " # ", " # "],
+    [" # ", " # ", "11 ", "   ", "   ", "   ", "   ", " # ", "12 ", "   ", "   ", "   ", "   ", " # ", " # "],
+    [" # ", "13 ", "   ", "   ", " # ", "14 ", "   ", "15 ", "   ", "   ", " # ", "16 ", "   ", "17 ", " # "],
+    [" # ", "18 ", "   ", "   ", "19 ", " # ", "20 ", "   ", "   ", " # ", "21 ", "   ", "   ", "   ", " # "],
+    [" # ", "22 ", "   ", "   ", "   ", " # ", "23 ", "   ", "   ", " # ", "24 ", "   ", "   ", "   ", " # "],
+    [" # ", " # ", "25 ", "   ", "   ", "26 ", " # ", " # ", " # ", "27 ", "   ", "   ", "   ", " # ", " # "],
+    [" # ", " # ", " # ", "28 ", "   ", "   ", "29 ", " # ", "30 ", "   ", "   ", "   ", " # ", " # ", " # "],
+    [" # ", " # ", " # ", " # ", "31 ", "   ", "   ", "32 ", "   ", "   ", "   ", " # ", " # ", " # ", " # "],
+    [" # ", " # ", " # ", " # ", " # ", "33 ", "   ", "   ", "   ", "   ", " # ", " # ", " # ", " # ", " # "],
+    [" # ", " # ", " # ", " # ", " # ", " # ", " N ", " T ", " H ", " # ", " # ", " # ", " # ", " # ", " # "],
+    [" # ", " # ", " # ", " # ", " # ", " # ", " # ", "   ", " # ", " # ", " # ", " # ", " # ", " # ", " # "],
+    [" # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # "]
+]
+
+# Function definitions for loading words, generating slots, constraints, AC-3, forward checking, and backtracking
 def load_words_from_file(filename):
     """Reads words from the specified file and returns a list of words."""
     words = []
@@ -10,32 +29,13 @@ def load_words_from_file(filename):
         with open(filename, 'r') as file:
             for line in file:
                 word = line.strip()
-                if word:  # Ignore any blank lines
-                    words.append(word.upper())  # Convert words to uppercase for consistency
+                if word:
+                    words.append(word.upper())
         if not words:
             print("Warning: Word list is empty.")
     except FileNotFoundError:
         print(f"Error: The file {filename} was not found.")
     return words
-
-# Usage
-word_list = load_words_from_file("Words.txt")
-
-initial_grid = [
-    [" # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # "],
-    [" # ", " # ", " # ", " 1 ", "   ", "   ", "   ", "   ", "   ", " 2 ", " # ", " # ", " # ", " # "],
-    [" # ", " # ", " # ", "   ", " # ", " # ", " # ", " # ", " # ", "   ", " # ", " # ", " 3 ", " # "],
-    [" # ", " # ", " # ", "   ", " # ", " # ", " # ", " # ", " # ", "   ", " # ", " # ", "   ", " # "],
-    [" # ", " # ", " # ", "   ", " # ", " # ", " 4 ", "   ", " 5 ", "   ", "   ", " # ", "   ", " # "],
-    [" # ", " # ", " # ", "   ", " # ", " # ", " # ", " # ", "   ", " # ", " # ", " # ", "   ", " # "],
-    [" # ", " # ", " # ", " # ", " # ", " 6 ", " # ", " # ", " 7 ", "   ", " 8 ", "   ", "   ", " # "],
-    [" # ", " # ", " # ", " # ", " # ", "   ", " # ", " # ", "   ", " # ", "   ", " # ", "   ", " # "],
-    [" # ", " # ", " 9 ", " # ", "10 ", "   ", "   ", "   ", "   ", " # ", "   ", " # ", " # ", " # "],
-    [" # ", " # ", "   ", " # ", " # ", "   ", " # ", " # ", "   ", " # ", "   ", " # ", " # ", " # "],
-    [" # ", "11 ", "   ", "   ", "   ", "   ", "   ", " # ", " # ", " # ", "   ", " # ", " # ", " # "],
-    [" # ", " # ", "   ", " # ", " # ", "   ", " # ", " # ", " # ", " # ", "   ", " # ", " # ", " # "],
-    [" # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # ", " # "]
-    ]
 
 def generate_slots(grid):
     """Generate slots for across and down words based on the grid layout."""
@@ -45,7 +45,6 @@ def generate_slots(grid):
     cols = len(grid[0])
     cell_contents = {}
 
-    # Store cell contents (pre-filled letters)
     for r in range(rows):
         for c in range(cols):
             cell = grid[r][c].strip()
@@ -53,25 +52,18 @@ def generate_slots(grid):
                 if re.match(r"^[A-Z]$", cell):
                     cell_contents[(r, c)] = cell
                 else:
-                    cell_contents[(r, c)] = None  # Number or empty cell
+                    cell_contents[(r, c)] = None
 
-    # Identify across slots
     for r in range(rows):
         c = 0
         while c < cols:
             cell = grid[r][c].strip()
             if cell != "#" and not re.match(r"^[A-Z]$", cell):
                 if c == 0 or grid[r][c-1].strip() == "#" or re.match(r"^[A-Z]$", grid[r][c-1].strip()):
-                    # Potential start of across word
                     slot_length = 0
                     positions = []
                     slot_number = cell if re.match(r"^\d+$", cell) else None
-                    c_start = c
                     while c < cols and grid[r][c].strip() != "#" and not re.match(r"^[A-Z]$", grid[r][c].strip()):
-                        positions.append((r, c))
-                        slot_length += 1
-                        c += 1
-                    while c < cols and re.match(r"^[A-Z]$", grid[r][c].strip()):
                         positions.append((r, c))
                         slot_length += 1
                         c += 1
@@ -79,32 +71,18 @@ def generate_slots(grid):
                         slot_name = f"{slot_number}ACROSS" if slot_number else f"{slot_id}ACROSS"
                         slots[slot_name] = positions
                         slot_id += 1
-                    else:
-                        c += 1
-                else:
-                    c += 1
-            elif re.match(r"^[A-Z]$", cell):
-                c += 1
-            else:
-                c += 1
+            c += 1
 
-    # Identify down slots
     for c in range(cols):
         r = 0
         while r < rows:
             cell = grid[r][c].strip()
             if cell != "#" and not re.match(r"^[A-Z]$", cell):
                 if r == 0 or grid[r-1][c].strip() == "#" or re.match(r"^[A-Z]$", grid[r-1][c].strip()):
-                    # Potential start of down word
                     slot_length = 0
                     positions = []
                     slot_number = cell if re.match(r"^\d+$", cell) else None
-                    r_start = r
                     while r < rows and grid[r][c].strip() != "#" and not re.match(r"^[A-Z]$", grid[r][c].strip()):
-                        positions.append((r, c))
-                        slot_length += 1
-                        r += 1
-                    while r < rows and re.match(r"^[A-Z]$", grid[r][c].strip()):
                         positions.append((r, c))
                         slot_length += 1
                         r += 1
@@ -112,18 +90,9 @@ def generate_slots(grid):
                         slot_name = f"{slot_number}DOWN" if slot_number else f"{slot_id}DOWN"
                         slots[slot_name] = positions
                         slot_id += 1
-                    else:
-                        r += 1
-                else:
-                    r += 1
-            elif re.match(r"^[A-Z]$", cell):
-                r += 1
-            else:
-                r += 1
+            r += 1
 
     return slots, cell_contents
-
-slots, cell_contents = generate_slots(initial_grid)
 
 def generate_crossword_variables(slots, cell_contents):
     """Generate crossword variables with word lengths and pre-filled letters for each slot."""
@@ -136,8 +105,6 @@ def generate_crossword_variables(slots, cell_contents):
                 pre_filled[idx] = cell_contents[(row, col)]
         crossword_variables[slot] = {"length": length, "pre_filled": pre_filled}
     return crossword_variables
-
-crossword_variables = generate_crossword_variables(slots, cell_contents)
 
 def generate_constraints(slots):
     """Automatically generate constraints based on intersecting slots."""
@@ -160,23 +127,42 @@ def generate_constraints(slots):
 
     return constraints
 
-constraints = generate_constraints(slots)
+def ac3(variables, constraints, domains):
+    """Enforce arc consistency with AC-3 algorithm."""
+    queue = [(var1, var2) for var1, var2 in constraints]
+    while queue:
+        (var1, var2) = queue.pop(0)
+        if revise(variables, domains, var1, var2, constraints):
+            if not domains[var1]:
+                return False
+            for var3 in [v for v in variables if v != var1 and (v, var1) in constraints]:
+                queue.append((var3, var1))
+    return True
 
-def solve_crossword(variables, slots, word_list, randomize=False):
-    """Solve the crossword puzzle using backtracking with multiple heuristics."""
+def revise(variables, domains, var1, var2, constraints):
+    """Revise the domain of var1 based on var2."""
+    revised = False
+    for x in domains[var1][:]:
+        if not any(x[pos1] == y[pos2] for y in domains[var2] for pos1, pos2 in constraints[(var1, var2)]):
+            domains[var1].remove(x)
+            revised = True
+    return revised
+
+def solve_crossword(variables, slots, word_list, constraints, randomize=False):
+    """Solve the crossword puzzle using backtracking with enhanced heuristics."""
     backtrack_count = 0
 
-    # Preprocess: Build adjacency (constraint) counts for degree heuristic
-    adjacency_counts = {}
-    for var in variables:
-        adjacency_counts[var] = sum(1 for key in constraints if var in key)
+    # Set up domains for each variable based on word length and pre-filled letters
+    domains = {var: [word for word in word_list if len(word) == details["length"]
+                     and all(word[idx] == letter for idx, letter in details["pre_filled"].items())]
+               for var, details in variables.items()}
+
+    # Apply AC-3 to enforce arc consistency before starting backtracking
+    if not ac3(variables, constraints, domains):
+        return None
 
     def is_consistent(var, word, assignment):
         """Check if placing a word in a slot is consistent with all constraints."""
-        # Check pre-filled letters
-        for idx, letter in variables[var]["pre_filled"].items():
-            if word[idx] != letter:
-                return False
         for other_var in assignment:
             if (var, other_var) in constraints:
                 for pos1, pos2 in constraints[(var, other_var)]:
@@ -187,58 +173,49 @@ def solve_crossword(variables, slots, word_list, randomize=False):
     def select_unassigned_variable(assignment):
         """Select the next unassigned variable using MRV and Degree Heuristic."""
         unassigned_vars = [v for v in variables if v not in assignment]
-        # MRV: Minimum Remaining Values
-        min_domain_size = min(len(variables[v]["domain"]) for v in unassigned_vars)
-        mrv_vars = [v for v in unassigned_vars if len(variables[v]["domain"]) == min_domain_size]
+        mrv_vars = sorted(unassigned_vars, key=lambda v: len(domains[v]))
+        min_domain_size = len(domains[mrv_vars[0]])
+        mrv_vars = [v for v in mrv_vars if len(domains[v]) == min_domain_size]
+        
         if len(mrv_vars) == 1:
             return mrv_vars[0]
         else:
-            # Degree Heuristic: Choose the variable with the most constraints on remaining variables
-            max_degree = max(adjacency_counts[v] for v in mrv_vars)
-            degree_vars = [v for v in mrv_vars if adjacency_counts[v] == max_degree]
-            if randomize:
-                return random.choice(degree_vars)
-            else:
-                return degree_vars[0]
+            return max(mrv_vars, key=lambda v: sum(1 for key in constraints if v in key))
 
     def order_domain_values(var, assignment):
         """Order the domain values using the Least Constraining Value heuristic."""
         if randomize:
-            domain = variables[var]["domain"][:]
-            random.shuffle(domain)
-            return domain
+            random.shuffle(domains[var])
+            return domains[var]
 
         def count_conflicts(word):
-            conflicts = 0
-            for other_var in variables:
-                if other_var != var and other_var not in assignment and (var, other_var) in constraints:
-                    for other_word in variables[other_var]["domain"]:
-                        for pos1, pos2 in constraints[(var, other_var)]:
-                            if word[pos1] != other_word[pos2]:
-                                conflicts += 1
-            return conflicts
+            return sum(1 for other_var in variables if other_var != var and other_var not in assignment
+                       and (var, other_var) in constraints
+                       for other_word in domains[other_var]
+                       for pos1, pos2 in constraints[(var, other_var)]
+                       if word[pos1] != other_word[pos2])
 
-        # Sort domain values by least constraining value
-        return sorted(variables[var]["domain"], key=count_conflicts)
+        return sorted(domains[var], key=count_conflicts)
 
-    def forward_check(var, word, assignment, domains):
-        """Perform forward checking and prune inconsistent values from domains."""
-        temp_domains = {v: domains[v][:] for v in domains}
+    def forward_check(var, word, assignment):
+        """Perform forward checking and track domain changes."""
+        changes = {v: [] for v in variables}
         for other_var in variables:
             if other_var not in assignment and (var, other_var) in constraints:
                 for other_word in domains[other_var][:]:
-                    conflict = False
-                    for pos1, pos2 in constraints[(var, other_var)]:
-                        if word[pos1] != other_word[pos2]:
-                            conflict = True
-                            break
-                    if conflict:
+                    if any(word[pos1] != other_word[pos2] for pos1, pos2 in constraints[(var, other_var)]):
                         domains[other_var].remove(other_word)
+                        changes[other_var].append(other_word)
                 if not domains[other_var]:
-                    return None
-        return temp_domains
+                    return False, changes
+        return True, changes
 
-    def backtrack(assignment, domains):
+    def revert_domains(changes):
+        """Revert domain changes after backtracking."""
+        for var, removed_words in changes.items():
+            domains[var].extend(removed_words)
+
+    def backtrack(assignment):
         nonlocal backtrack_count
         if len(assignment) == len(variables):
             return assignment
@@ -247,48 +224,21 @@ def solve_crossword(variables, slots, word_list, randomize=False):
         for word in order_domain_values(var, assignment):
             if is_consistent(var, word, assignment):
                 assignment[var] = word
-                # Deep copy domains for forward checking
-                new_domains = {v: domains[v][:] for v in domains}
-                result_domains = forward_check(var, word, assignment, new_domains)
-                if result_domains is not None:
-                    result = backtrack(assignment, result_domains)
+                success, changes = forward_check(var, word, assignment)
+                if success:
+                    result = backtrack(assignment)
                     if result:
                         return result
                 del assignment[var]
-        backtrack_count += 1  # Increment backtracking counter
+                revert_domains(changes)
+        backtrack_count += 1
         return None
 
-    # Set up domains for each variable based on word length and pre-filled letters
-    for var, details in variables.items():
-        length = details["length"]
-        pre_filled = details["pre_filled"]
-        variables[var]["domain"] = []
-        for word in word_list:
-            if len(word) == length:
-                match = True
-                for idx, letter in pre_filled.items():
-                    if word[idx] != letter:
-                        match = False
-                        break
-                if match:
-                    variables[var]["domain"].append(word)
-        if not variables[var]["domain"]:
-            print(f"No words of length {length} matching pre-filled letters for slot {var}.")
-            return None
-
-    # Optionally randomize variable and value selection
-    if randomize:
-        for var in variables:
-            random.shuffle(variables[var]["domain"])
-
     start_time = time.time()
-    # Create initial domains
-    domains = {var: variables[var]["domain"][:] for var in variables}
-    solution = backtrack({}, domains)
+    solution = backtrack({})
     end_time = time.time()
 
-    time_taken = end_time - start_time
-    print(f"Time taken: {time_taken:.4f} seconds")
+    print(f"Time taken: {end_time - start_time:.4f} seconds")
     print(f"Backtracks taken: {backtrack_count}")
     return solution
 
@@ -318,9 +268,16 @@ if __name__ == "__main__":
         print("|" + "|".join(display_row) + "|")  # Row content with side borders
     print("+---" * len(initial_grid[0]) + "+")  # Bottom border for the last row
 
+    # Load the word list
+    word_list = load_words_from_file("Words.txt")
+
+    # Generate slots and constraints
+    slots, cell_contents = generate_slots(initial_grid)
+    crossword_variables = generate_crossword_variables(slots, cell_contents)
+    constraints = generate_constraints(slots)
+
     # Solve the crossword puzzle
-    # Set randomize=True to enable solution randomization
-    solution = solve_crossword(crossword_variables, slots, word_list, randomize=True)
+    solution = solve_crossword(crossword_variables, slots, word_list, constraints, randomize=True)
 
     if solution:
         print("\nSolution Found:")
