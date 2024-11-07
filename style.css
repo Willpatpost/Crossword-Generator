@@ -43,15 +43,21 @@ h1 {
     align-items: center;
     font-size: 1.1em;
     font-weight: bold;
-    color: #333;
     cursor: pointer;
+    color: white; /* Start with text color set to white */
     background-color: black; /* Ensure all cells start as black */
 }
 
 /* Styling for blacked-out cells */
 .black-cell {
     background-color: black;
-    color: black;
+    color: black; /* Hide text in black cells */
+}
+
+/* Styling for white cells */
+.white-cell {
+    background-color: white;
+    color: #333; /* Ensure text in white cells is visible */
 }
 
 /* Styling for grid rows */
