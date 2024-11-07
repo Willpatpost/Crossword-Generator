@@ -8,7 +8,7 @@ let currentNumber = 1;
 
 // Load words from an external file
 async function loadWords() {
-    const response = await fetch('Data/Words.txt');
+    const response = await fetch('Data/words.txt');
     const text = await response.text();
     words = text.split('\n').map(word => word.trim().toUpperCase());
 }
@@ -42,33 +42,6 @@ function generateGrid() {
     }
 }
 
-// Start number-entry mode, continuing from the highest number on the grid
-function startNumberEntryMode() {
-    currentNumber = getMaxNumberOnGrid() + 1; // Start numbering from the next available number
-    isNumberEntryMode = true;
-    document.getElementById("stopNumberEntryButton").style.display = "inline";
-}
-
-// Stop number-entry mode
-function stopNumberEntryMode() {
-    isNumberEntryMode = false;
-    document.getElementById("stopNumberEntryButton").style.display = "none";
-}
-
-// Get the maximum number currently on the grid to continue numbering in sequence
-function getMaxNumberOnGrid() {
-    let maxNumber = 0;
-    for (let row of grid) {
-        for (let cell of row) {
-            const cellNumber = parseInt(cell);
-            if (!isNaN(cellNumber) && cellNumber > maxNumber) {
-                maxNumber = cellNumber;
-            }
-        }
-    }
-    return maxNumber;
-}
-
 // Toggle cell between black and white, or add a number in number-entry mode
 function toggleCellOrAddNumber(cell) {
     const row = parseInt(cell.dataset.row);
@@ -96,10 +69,36 @@ function toggleCellOrAddNumber(cell) {
     }
 }
 
+// Start number-entry mode, continuing from the highest number on the grid
+function startNumberEntryMode() {
+    currentNumber = getMaxNumberOnGrid() + 1; // Start numbering from the next available number
+    isNumberEntryMode = true;
+    document.getElementById("stopNumberEntryButton").style.display = "inline";
+}
+
+// Stop number-entry mode
+function stopNumberEntryMode() {
+    isNumberEntryMode = false;
+    document.getElementById("stopNumberEntryButton").style.display = "none";
+}
+
+// Get the maximum number currently on the grid to continue numbering in sequence
+function getMaxNumberOnGrid() {
+    let maxNumber = 0;
+    for (let row of grid) {
+        for (let cell of row) {
+            const cellNumber = parseInt(cell);
+            if (!isNaN(cellNumber) && cellNumber > maxNumber) {
+                maxNumber = cellNumber;
+            }
+        }
+    }
+    return maxNumber;
+}
+
 // Generate slots based on the grid layout and determine directions
 function generateSlots() {
     slots = { across: {}, down: {} };
-    let slotId = 1;
 
     // Across Slots
     for (let r = 0; r < grid.length; r++) {
@@ -112,10 +111,8 @@ function generateSlots() {
                     positions.push([r, c]);
                     c++;
                 }
-                if (positions.length > 1) {
-                    let slotKey = startNumber && !isNaN(startNumber) ? startNumber + "A" : slotId + "A";
-                    slots.across[slotKey] = positions;
-                    slotId++;
+                if (positions.length > 1 && startNumber && !isNaN(startNumber)) {
+                    slots.across[startNumber] = positions;
                 }
             } else {
                 c++;
@@ -134,10 +131,8 @@ function generateSlots() {
                     positions.push([r, c]);
                     r++;
                 }
-                if (positions.length > 1) {
-                    let slotKey = startNumber && !isNaN(startNumber) ? startNumber + "D" : slotId + "D";
-                    slots.down[slotKey] = positions;
-                    slotId++;
+                if (positions.length > 1 && startNumber && !isNaN(startNumber)) {
+                    slots.down[startNumber] = positions;
                 }
             } else {
                 r++;
@@ -173,7 +168,6 @@ function generateConstraints() {
             }
         }
     }
-
     console.log("Generated Constraints:", constraints);
 }
 
@@ -185,6 +179,7 @@ function solveCrossword() {
     if (result) {
         displaySolution();
         document.getElementById("result").textContent = "Crossword solved!";
+        displayWordList(); // Display the word list by slots
     } else {
         document.getElementById("result").textContent = "No possible solution.";
     }
@@ -242,7 +237,7 @@ function isConsistent(slot, word, assignment) {
 function displaySolution() {
     for (const slot in solution) {
         const word = solution[slot];
-        const positions = slots[slot.includes("A") ? "across" : "down"][slot];
+        const positions = slots[slot in slots.across ? 'across' : 'down'][slot];
 
         positions.forEach(([row, col], idx) => {
             const cell = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
@@ -251,6 +246,24 @@ function displaySolution() {
             }
         });
     }
+}
+
+// Display word list organized by slot number and direction
+function displayWordList() {
+    let acrossWords = [];
+    let downWords = [];
+
+    // Collect words for across and down, sorted by slot number
+    Object.keys(slots.across).sort((a, b) => a - b).forEach(slot => {
+        acrossWords.push(`${slot}: ${solution[slot]}`);
+    });
+    Object.keys(slots.down).sort((a, b) => a - b).forEach(slot => {
+        downWords.push(`${slot}: ${solution[slot]}`);
+    });
+
+    // Display the word list in the result area
+    const resultArea = document.getElementById("result");
+    resultArea.innerHTML = `<h3>Across:</h3><p>${acrossWords.join('<br>')}</p><h3>Down:</h3><p>${downWords.join('<br>')}</p>`;
 }
 
 // Initialize word list on page load
