@@ -18,7 +18,7 @@ function generateGrid() {
     const rows = parseInt(document.getElementById("rows").value);
     const cols = parseInt(document.getElementById("columns").value);
 
-    grid = Array.from({ length: rows }, () => Array(cols).fill("#")); // Start with all cells black
+    grid = Array.from({ length: rows }, () => Array(cols).fill("#")); // All cells start as black
 
     const gridContainer = document.getElementById("gridContainer");
     gridContainer.innerHTML = ""; // Clear existing grid
@@ -29,11 +29,11 @@ function generateGrid() {
 
         for (let c = 0; c < cols; c++) {
             const cellDiv = document.createElement("div");
-            cellDiv.classList.add("grid-cell", "black-cell");
+            cellDiv.classList.add("grid-cell", "black-cell"); // Start each cell as black
             cellDiv.dataset.row = r;
             cellDiv.dataset.col = c;
 
-            // Click event to toggle cell to white or black, or to add a number in number-entry mode
+            // Event for toggling cell color or adding a number
             cellDiv.addEventListener("click", () => toggleCellOrAddNumber(cellDiv));
 
             rowDiv.appendChild(cellDiv);
