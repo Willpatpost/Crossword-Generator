@@ -42,31 +42,11 @@ function generateGrid() {
     }
 }
 
-// Start number-entry mode with sequential numbering in left-to-right, top-to-bottom order
+// Start number-entry mode, continuing from the highest number on the grid
 function startNumberEntryMode() {
     currentNumber = getMaxNumberOnGrid() + 1; // Start numbering from the next available number
     isNumberEntryMode = true;
     document.getElementById("stopNumberEntryButton").style.display = "inline";
-
-    // Begin numbering in left-to-right, top-to-bottom order
-    numberInSequence();
-}
-
-// Function to sequentially add numbers in the grid based on currentNumber
-function numberInSequence() {
-    const rows = grid.length;
-    const cols = grid[0].length;
-
-    // Loop through each cell in top-to-bottom, left-to-right order
-    for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-            const cell = document.querySelector(`.grid-cell[data-row="${r}"][data-col="${c}"]`);
-            if (isNumberEntryMode && cell && cell.classList.contains("white-cell") && !cell.textContent) {
-                cell.textContent = currentNumber++;
-                grid[r][c] = cell.textContent;
-            }
-        }
-    }
 }
 
 // Stop number-entry mode
