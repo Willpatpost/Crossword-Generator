@@ -4,9 +4,9 @@ let slots = { across: {}, down: {} };
 let constraints = {}; // Stores constraints between intersecting slots
 let solution = {};    // Stores the solution words for each slot
 
-// Load words from an external file (words.txt)
+// Load words from the words.txt file located in the Data directory
 async function loadWords() {
-    const response = await fetch('words.txt');
+    const response = await fetch('Data/Words.txt');  // Adjusted path to Data directory
     const text = await response.text();
     words = text.split('\n').map(word => word.trim().toUpperCase());
 }
