@@ -7,20 +7,24 @@
 
 /* Body styling */
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Roboto', sans-serif;
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 20px;
-    background-color: #f7f7f7;
-}
-
-h1 {
+    background-color: #f0f2f5;
     color: #333;
-    margin-bottom: 20px;
 }
 
-/* Container for grid settings */
+/* Page title styling */
+h1 {
+    color: #222;
+    font-size: 2.2em;
+    margin-bottom: 25px;
+    font-weight: 600;
+}
+
+/* Settings container styling */
 #settings {
     margin-bottom: 20px;
 }
@@ -28,36 +32,53 @@ h1 {
 /* Grid container styling */
 #gridContainer {
     display: inline-block;
-    border: 2px solid #333;
+    border: 3px solid #444;
     background-color: #ffffff;
-    margin-bottom: 20px;
+    padding: 5px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin-bottom: 25px;
 }
 
-/* Basic cell styling */
+/* Basic cell styling with smooth transition */
 .grid-cell {
     width: 30px;
     height: 30px;
-    border: 1px solid #333;
+    border: 1px solid #666;
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    font-size: 1.1em;
+    font-size: 1.2em;
     font-weight: bold;
     cursor: pointer;
-    color: white; /* Start with text color set to white */
-    background-color: black; /* Ensure all cells start as black */
+    color: #333;
+    background-color: #333;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Styling for blacked-out cells */
 .black-cell {
-    background-color: black;
-    color: black; /* Hide text in black cells */
+    background-color: #333;
+    color: #333; /* Hide text in black cells */
 }
 
 /* Styling for white cells */
 .white-cell {
-    background-color: white;
-    color: #333; /* Ensure text in white cells is visible */
+    background-color: #f8f9fa;
+    color: #444;
+}
+
+/* Highlight solved cells for a clear distinction */
+.solved-cell {
+    background-color: #d1e7dd;
+    color: #155724;
+    font-weight: bold;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Smooth color transition on cell toggle */
+.grid-cell:hover {
+    background-color: #ddd;
+    color: #222;
 }
 
 /* Styling for grid rows */
@@ -65,44 +86,101 @@ h1 {
     display: flex;
 }
 
-/* Settings and controls styling */
-#controls {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
+/* Control button styling with modern look */
 button {
-    padding: 10px 15px;
+    padding: 10px 20px;
     margin: 5px;
     border: none;
-    background-color: #007bff;
-    color: #fff;
+    background-color: #0069d9;
+    color: #ffffff;
     font-size: 1em;
     cursor: pointer;
     border-radius: 5px;
+    font-weight: 500;
+    transition: background-color 0.2s ease, transform 0.1s ease;
 }
 
 button:hover {
     background-color: #0056b3;
+    transform: scale(1.05);
+}
+
+button:active {
+    transform: scale(1);
+}
+
+/* Stop button styling for easy identification */
+#stopNumberEntryButton {
+    background-color: #dc3545;
+}
+
+#stopNumberEntryButton:hover {
+    background-color: #c82333;
 }
 
 /* Word List Section Styling */
 #word-list {
     margin-top: 20px;
-    width: 80%;
+    width: 85%;
     text-align: left;
+    color: #333;
 }
 
+/* Result display styling */
+#result {
+    font-size: 1.1em;
+    line-height: 1.6;
+    color: #222;
+    white-space: pre-line;
+    margin-top: 15px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 85%;
+}
+
+/* Word list headings for "Across" and "Down" */
 #word-list h3 {
-    font-size: 1.2em;
+    font-size: 1.3em;
     color: #333;
     margin-bottom: 10px;
+    font-weight: 500;
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 5px;
+    margin-top: 15px;
 }
 
-#result {
-    font-size: 1em;
-    line-height: 1.5;
-    color: #333;
-    white-space: pre-line;
+/* Styling for controls container */
+#controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #ffffff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Add smooth transition to cell coloring */
+.grid-cell {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+    #gridContainer {
+        transform: scale(0.9);
+    }
+    h1 {
+        font-size: 1.8em;
+    }
+    #result {
+        width: 100%;
+        font-size: 1em;
+    }
+    button {
+        font-size: 0.9em;
+        padding: 8px 15px;
+    }
 }
