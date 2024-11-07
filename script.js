@@ -106,12 +106,13 @@ function generateSlots() {
         while (c < grid[r].length) {
             if (grid[r][c] !== "#") {
                 let positions = [];
-                let startNumber = grid[r][c]; // Check if there's a number at the start of the slot
+                let startNumber = parseInt(grid[r][c]); // Check if there's a number at the start of the slot
                 while (c < grid[r].length && grid[r][c] !== "#") {
                     positions.push([r, c]);
                     c++;
                 }
-                if (positions.length > 1 && startNumber && !isNaN(startNumber)) {
+                // Only add slot if there's a valid starting number and slot length > 1
+                if (positions.length > 1 && !isNaN(startNumber)) {
                     slots.across[startNumber] = positions;
                 }
             } else {
@@ -126,12 +127,12 @@ function generateSlots() {
         while (r < grid.length) {
             if (grid[r][c] !== "#") {
                 let positions = [];
-                let startNumber = grid[r][c];
+                let startNumber = parseInt(grid[r][c]);
                 while (r < grid.length && grid[r][c] !== "#") {
                     positions.push([r, c]);
                     r++;
                 }
-                if (positions.length > 1 && startNumber && !isNaN(startNumber)) {
+                if (positions.length > 1 && !isNaN(startNumber)) {
                     slots.down[startNumber] = positions;
                 }
             } else {
