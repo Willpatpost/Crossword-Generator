@@ -100,21 +100,48 @@ function getMaxNumberOnGrid() {
 function generateSlots() {
     slots = { across: {}, down: {} };
 
+    // Helper function to get connected cells from a starting point
+    function getConnectedCells(r, c) {
+        const stack = [[r, c]];
+        const visited = new Set();
+        const positions = [];
+        let hasNumber = false;
+
+        while (stack.length > 0) {
+            const [row, col] = stack.pop();
+            const key = `${row},${col}`;
+
+            if (!visited.has(key) && grid[row][col] !== "#") {
+                visited.add(key);
+                positions.push([row, col]);
+
+                const cellNumber = parseInt(grid[row][col]);
+                if (!isNaN(cellNumber)) hasNumber = true;
+
+                // Check adjacent cells (up, down, left, right)
+                if (row > 0) stack.push([row - 1, col]);
+                if (row < grid.length - 1) stack.push([row + 1, col]);
+                if (col > 0) stack.push([row, col - 1]);
+                if (col < grid[row].length - 1) stack.push([row, col + 1]);
+            }
+        }
+        return { positions, hasNumber };
+    }
+
     // Across Slots
     for (let r = 0; r < grid.length; r++) {
         let c = 0;
         while (c < grid[r].length) {
             if (grid[r][c] !== "#") {
-                let positions = [];
-                let startNumber = parseInt(grid[r][c]); // Check if there's a number at the start of the slot
-                while (c < grid[r].length && grid[r][c] !== "#") {
-                    positions.push([r, c]);
-                    c++;
-                }
-                // Only add slot if there's a valid starting number and slot length > 1
-                if (positions.length > 1 && !isNaN(startNumber)) {
+                const { positions, hasNumber } = getConnectedCells(r, c);
+                const startNumber = parseInt(grid[r][c]);
+                
+                if (positions.length > 1 && hasNumber && !isNaN(startNumber)) {
                     slots.across[startNumber] = positions;
                 }
+                
+                // Move to the next segment
+                c += positions.length;
             } else {
                 c++;
             }
@@ -126,15 +153,15 @@ function generateSlots() {
         let r = 0;
         while (r < grid.length) {
             if (grid[r][c] !== "#") {
-                let positions = [];
-                let startNumber = parseInt(grid[r][c]);
-                while (r < grid.length && grid[r][c] !== "#") {
-                    positions.push([r, c]);
-                    r++;
-                }
-                if (positions.length > 1 && !isNaN(startNumber)) {
+                const { positions, hasNumber } = getConnectedCells(r, c);
+                const startNumber = parseInt(grid[r][c]);
+                
+                if (positions.length > 1 && hasNumber && !isNaN(startNumber)) {
                     slots.down[startNumber] = positions;
                 }
+                
+                // Move to the next segment
+                r += positions.length;
             } else {
                 r++;
             }
