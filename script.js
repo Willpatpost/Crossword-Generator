@@ -3,20 +3,22 @@ let words = [];
 let slots = { across: {}, down: {} };
 let constraints = {};
 let solution = {};
+let isNumberEntryMode = false;
+let currentNumber = 1;
 
 // Load words from an external file
 async function loadWords() {
-    const response = await fetch('Data/Words.txt');
+    const response = await fetch('Data/words.txt');
     const text = await response.text();
     words = text.split('\n').map(word => word.trim().toUpperCase());
 }
 
-// Initialize the grid with empty cells based on selected rows and columns
+// Initialize the grid with black cells
 function generateGrid() {
     const rows = parseInt(document.getElementById("rows").value);
     const cols = parseInt(document.getElementById("columns").value);
 
-    grid = Array.from({ length: rows }, () => Array(cols).fill(" "));
+    grid = Array.from({ length: rows }, () => Array(cols).fill("#")); // Start with all cells black
 
     const gridContainer = document.getElementById("gridContainer");
     gridContainer.innerHTML = ""; // Clear existing grid
@@ -27,13 +29,12 @@ function generateGrid() {
 
         for (let c = 0; c < cols; c++) {
             const cellDiv = document.createElement("div");
-            cellDiv.classList.add("grid-cell");
+            cellDiv.classList.add("grid-cell", "black-cell");
             cellDiv.dataset.row = r;
             cellDiv.dataset.col = c;
 
-            // Click event to toggle cell to black or add a number
-            cellDiv.addEventListener("click", () => toggleCell(cellDiv));
-            cellDiv.addEventListener("dblclick", () => addNumber(cellDiv));
+            // Click event to toggle cell to white or black, or to add a number in number-entry mode
+            cellDiv.addEventListener("click", () => toggleCellOrAddNumber(cellDiv));
 
             rowDiv.appendChild(cellDiv);
         }
@@ -41,32 +42,41 @@ function generateGrid() {
     }
 }
 
-// Toggle cell between white and black (blocked)
-function toggleCell(cell) {
-    const row = cell.dataset.row;
-    const col = cell.dataset.col;
+// Toggle cell between black and white, or add a number in number-entry mode
+function toggleCellOrAddNumber(cell) {
+    const row = parseInt(cell.dataset.row);
+    const col = parseInt(cell.dataset.col);
 
-    if (cell.classList.contains("black-cell")) {
-        cell.classList.remove("black-cell");
-        grid[row][col] = " ";
+    if (isNumberEntryMode) {
+        if (!cell.classList.contains("black-cell") && !cell.textContent) {
+            cell.textContent = currentNumber++;
+            grid[row][col] = cell.textContent;
+        }
     } else {
-        cell.classList.add("black-cell");
-        grid[row][col] = "#";
+        if (cell.classList.contains("black-cell")) {
+            cell.classList.remove("black-cell");
+            grid[row][col] = " ";
+        } else {
+            cell.classList.add("black-cell");
+            cell.textContent = "";
+            grid[row][col] = "#";
+        }
     }
 }
 
-// Add number to the cell for word starting points
-function addNumber(cell) {
-    const number = prompt("Enter a number for this cell:");
-    if (number && !isNaN(number)) {
-        cell.textContent = number;
-        const row = cell.dataset.row;
-        const col = cell.dataset.col;
-        grid[row][col] = number;
-    }
+// Start and stop number-entry mode
+function startNumberEntryMode() {
+    isNumberEntryMode = true;
+    currentNumber = 1;
+    document.getElementById("stopNumberEntryButton").style.display = "inline";
 }
 
-// Generate slots based on the grid layout
+function stopNumberEntryMode() {
+    isNumberEntryMode = false;
+    document.getElementById("stopNumberEntryButton").style.display = "none";
+}
+
+// Generate slots based on the grid layout and determine directions
 function generateSlots() {
     slots = { across: {}, down: {} };
     let slotId = 1;
