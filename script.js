@@ -48,17 +48,22 @@ function toggleCellOrAddNumber(cell) {
     const col = parseInt(cell.dataset.col);
 
     if (isNumberEntryMode) {
+        // Only allow number entry in white cells without existing numbers
         if (!cell.classList.contains("black-cell") && !cell.textContent) {
             cell.textContent = currentNumber++;
             grid[row][col] = cell.textContent;
         }
     } else {
+        // Toggle between black and white if not in number-entry mode
         if (cell.classList.contains("black-cell")) {
             cell.classList.remove("black-cell");
+            cell.classList.add("white-cell");
+            cell.textContent = ""; // Clear any number in the cell
             grid[row][col] = " ";
-        } else {
+        } else if (cell.classList.contains("white-cell")) {
+            cell.classList.remove("white-cell");
             cell.classList.add("black-cell");
-            cell.textContent = "";
+            cell.textContent = ""; // Clear any number in the cell
             grid[row][col] = "#";
         }
     }
