@@ -31,7 +31,7 @@ function cacheWordsByLength() {
     }
 }
 
-// Initialize the grid with black cells and load from local storage if available
+// Initialize the grid with black cells
 function generateGrid() {
     const rows = parseInt(document.getElementById("rows").value);
     const cols = parseInt(document.getElementById("columns").value);
@@ -42,7 +42,6 @@ function generateGrid() {
     }
 
     grid = Array.from({ length: rows }, () => Array(cols).fill("#"));
-    restoreGridFromLocalStorage();
 
     const gridContainer = document.getElementById("gridContainer");
     gridContainer.innerHTML = "";
@@ -72,7 +71,6 @@ function toggleCellOrAddNumber(cell) {
         if (!cell.classList.contains("black-cell") && !cell.textContent) {
             cell.textContent = currentNumber++;
             grid[row][col] = cell.textContent;
-            saveGridToLocalStorage();
         }
     } else {
         if (cell.classList.contains("black-cell")) {
@@ -84,7 +82,6 @@ function toggleCellOrAddNumber(cell) {
             cell.textContent = "";
             grid[row][col] = "#";
         }
-        saveGridToLocalStorage();
     }
 }
 
@@ -218,19 +215,6 @@ function generateConstraints() {
     }
 }
 
-// Save the current grid to local storage
-function saveGridToLocalStorage() {
-    localStorage.setItem("crosswordGrid", JSON.stringify(grid));
-}
-
-// Restore grid from local storage
-function restoreGridFromLocalStorage() {
-    const savedGrid = localStorage.getItem("crosswordGrid");
-    if (savedGrid) {
-        grid = JSON.parse(savedGrid);
-    }
-}
-
 // Solve the crossword puzzle using backtracking
 function solveCrossword() {
     generateSlots();
@@ -239,13 +223,13 @@ function solveCrossword() {
     if (result) {
         displaySolution();
         document.getElementById("result").textContent = "Crossword solved!";
-        displayWordList(); // Display the word list by slots
+        displayWordList();
     } else {
         document.getElementById("result").textContent = "No possible solution.";
     }
 }
 
-// Backtracking algorithm with constraint satisfaction and MRV heuristic
+// Backtracking algorithm with constraint satisfaction
 function backtrackingSolve(assignment = {}) {
     if (Object.keys(assignment).length === Object.keys(slots.across).length + Object.keys(slots.down).length) {
         solution = assignment;
@@ -267,35 +251,6 @@ function backtrackingSolve(assignment = {}) {
     return false;
 }
 
-// Select the next unassigned slot using Minimum Remaining Value (MRV) heuristic
-function selectUnassignedSlot(assignment) {
-    return Object.keys(slots.across)
-        .concat(Object.keys(slots.down))
-        .filter(slot => !assignment[slot])
-        .sort((a, b) => getPossibleWords(a).length - getPossibleWords(b).length)[0];
-}
-
-// Get possible words that match the slot length from the cached word list
-function getPossibleWords(slot) {
-    const slotLength = slots.across[slot] ? slots.across[slot].length : slots.down[slot].length;
-    return wordLengthCache[slotLength] || [];
-}
-
-// Check if placing a word in a slot is consistent with constraints
-function isConsistent(slot, word, assignment) {
-    if (!constraints[slot]) return true;
-
-    for (const constraint of constraints[slot]) {
-        const { slot: otherSlot, pos: [pos1, pos2] } = constraint;
-        const otherWord = assignment[otherSlot];
-
-        if (otherWord && word[pos1] !== otherWord[pos2]) {
-            return false;
-        }
-    }
-    return true;
-}
-
 // Display the solution on the grid
 function displaySolution() {
     for (const slot in solution) {
@@ -306,7 +261,7 @@ function displaySolution() {
             const cell = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
             if (cell) {
                 cell.textContent = word[idx];
-                cell.classList.add("solved-cell"); // Add a class for solved cells for styling
+                cell.classList.add("solved-cell");
             }
         });
     }
