@@ -87,9 +87,22 @@ button:hover {
     background-color: #0056b3;
 }
 
-/* Result message styling */
-#result {
-    margin-top: 10px;
-    font-weight: bold;
+/* Word List Section Styling */
+#word-list {
+    margin-top: 20px;
+    width: 80%;
+    text-align: left;
+}
+
+#word-list h3 {
+    font-size: 1.2em;
     color: #333;
+    margin-bottom: 10px;
+}
+
+#result {
+    font-size: 1em;
+    line-height: 1.5;
+    color: #333;
+    white-space: pre-line;
 }
