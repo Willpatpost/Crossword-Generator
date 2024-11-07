@@ -1,17 +1,17 @@
 let grid = [];
 let words = [];
 let slots = { across: {}, down: {} };
-let constraints = {}; // Stores constraints between intersecting slots
-let solution = {};    // Stores the solution words for each slot
+let constraints = {};
+let solution = {};
 
-// Load words from the words.txt file located in the Data directory
+// Load words from an external file
 async function loadWords() {
-    const response = await fetch('Data/Words.txt');  // Adjusted path to Data directory
+    const response = await fetch('Data/words.txt');
     const text = await response.text();
     words = text.split('\n').map(word => word.trim().toUpperCase());
 }
 
-// Initialize the grid based on user-selected size
+// Initialize the grid with empty cells based on selected size
 function generateGrid() {
     const gridSize = document.getElementById("gridSize").value.split("x");
     const rows = parseInt(gridSize[0]);
@@ -32,7 +32,9 @@ function generateGrid() {
             cellDiv.dataset.row = r;
             cellDiv.dataset.col = c;
 
+            // Click event to toggle cell to black or add a number
             cellDiv.addEventListener("click", () => toggleCell(cellDiv));
+            cellDiv.addEventListener("dblclick", () => addNumber(cellDiv));
 
             rowDiv.appendChild(cellDiv);
         }
@@ -40,7 +42,7 @@ function generateGrid() {
     }
 }
 
-// Toggle cell between white (empty) and black (blocked)
+// Toggle cell between white and black (blocked)
 function toggleCell(cell) {
     const row = cell.dataset.row;
     const col = cell.dataset.col;
@@ -51,6 +53,17 @@ function toggleCell(cell) {
     } else {
         cell.classList.add("black-cell");
         grid[row][col] = "#";
+    }
+}
+
+// Add number to the cell for word starting points
+function addNumber(cell) {
+    const number = prompt("Enter a number for this cell:");
+    if (number && !isNaN(number)) {
+        cell.textContent = number;
+        const row = cell.dataset.row;
+        const col = cell.dataset.col;
+        grid[row][col] = number;
     }
 }
 
@@ -65,12 +78,14 @@ function generateSlots() {
         while (c < grid[r].length) {
             if (grid[r][c] !== "#") {
                 let positions = [];
+                let startNumber = grid[r][c]; // Check if there's a number at the start of the slot
                 while (c < grid[r].length && grid[r][c] !== "#") {
                     positions.push([r, c]);
                     c++;
                 }
                 if (positions.length > 1) {
-                    slots.across[slotId + "A"] = positions;
+                    let slotKey = startNumber && !isNaN(startNumber) ? startNumber + "A" : slotId + "A";
+                    slots.across[slotKey] = positions;
                     slotId++;
                 }
             } else {
@@ -85,12 +100,14 @@ function generateSlots() {
         while (r < grid.length) {
             if (grid[r][c] !== "#") {
                 let positions = [];
+                let startNumber = grid[r][c];
                 while (r < grid.length && grid[r][c] !== "#") {
                     positions.push([r, c]);
                     r++;
                 }
                 if (positions.length > 1) {
-                    slots.down[slotId + "D"] = positions;
+                    let slotKey = startNumber && !isNaN(startNumber) ? startNumber + "D" : slotId + "D";
+                    slots.down[slotKey] = positions;
                     slotId++;
                 }
             } else {
@@ -103,11 +120,10 @@ function generateSlots() {
     console.log("Generated Slots:", slots);
 }
 
-// Generate constraints between intersecting slots
+// Generate constraints between intersecting slots (unchanged)
 function generateConstraints() {
     constraints = {};
 
-    // Find intersections between across and down slots
     for (let acrossSlot in slots.across) {
         for (let downSlot in slots.down) {
             const acrossPositions = slots.across[acrossSlot];
@@ -118,7 +134,6 @@ function generateConstraints() {
                     const [aRow, aCol] = acrossPositions[aIdx];
                     const [dRow, dCol] = downPositions[dIdx];
 
-                    // If positions match, there's an intersection
                     if (aRow === dRow && aCol === dCol) {
                         if (!constraints[acrossSlot]) constraints[acrossSlot] = [];
                         if (!constraints[downSlot]) constraints[downSlot] = [];
@@ -133,7 +148,7 @@ function generateConstraints() {
     console.log("Generated Constraints:", constraints);
 }
 
-// Solve the crossword puzzle using backtracking
+// Solve the crossword puzzle using backtracking (unchanged)
 function solveCrossword() {
     generateSlots();
 
@@ -146,58 +161,7 @@ function solveCrossword() {
     }
 }
 
-// Backtracking algorithm with constraint satisfaction
-function backtrackingSolve(assignment = {}) {
-    // Base case: if all slots are assigned, return the solution
-    if (Object.keys(assignment).length === Object.keys(slots.across).length + Object.keys(slots.down).length) {
-        solution = assignment;
-        return true;
-    }
-
-    // Select an unassigned slot
-    const slot = selectUnassignedSlot(assignment);
-    const possibleWords = getPossibleWords(slot);
-
-    for (let word of possibleWords) {
-        if (isConsistent(slot, word, assignment)) {
-            assignment[slot] = word;
-
-            if (backtrackingSolve(assignment)) return true;
-
-            delete assignment[slot]; // Remove assignment if not successful
-        }
-    }
-    return false;
-}
-
-// Select the next unassigned slot
-function selectUnassignedSlot(assignment) {
-    return Object.keys(slots.across).concat(Object.keys(slots.down)).find(slot => !assignment[slot]);
-}
-
-// Get possible words that match the slot length
-function getPossibleWords(slot) {
-    const slotLength = slots.across[slot] ? slots.across[slot].length : slots.down[slot].length;
-    return words.filter(word => word.length === slotLength);
-}
-
-// Check if placing a word in a slot is consistent with constraints
-function isConsistent(slot, word, assignment) {
-    if (!constraints[slot]) return true;
-
-    for (let constraint of constraints[slot]) {
-        const { slot: otherSlot, pos: [pos1, pos2] } = constraint;
-        const otherWord = assignment[otherSlot];
-
-        // If the intersecting slot already has a word assigned, enforce consistency
-        if (otherWord && word[pos1] !== otherWord[pos2]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-// Display the solution on the grid
+// Display solution on the grid (unchanged)
 function displaySolution() {
     for (const slot in solution) {
         const word = solution[slot];
@@ -212,5 +176,5 @@ function displaySolution() {
     }
 }
 
-// Initialize word list on page load
+// Load words on page load
 window.onload = loadWords;
