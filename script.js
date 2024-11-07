@@ -5,23 +5,47 @@ let constraints = {};
 let solution = {};
 let isNumberEntryMode = false;
 let currentNumber = 1;
+let wordLengthCache = {};
 
-// Load words from an external file
+// Load words from an external file and cache by word length
 async function loadWords() {
-    const response = await fetch('Data/Words.txt');
-    const text = await response.text();
-    words = text.split('\n').map(word => word.trim().toUpperCase());
+    try {
+        const response = await fetch('Data/Words.txt');
+        const text = await response.text();
+        words = text.split('\n').map(word => word.trim().toUpperCase());
+        cacheWordsByLength();
+    } catch (error) {
+        console.error("Error loading words:", error);
+    }
 }
 
-// Initialize the grid with black cells
+// Cache words by length to optimize getPossibleWords
+function cacheWordsByLength() {
+    wordLengthCache = {};
+    for (const word of words) {
+        const len = word.length;
+        if (!wordLengthCache[len]) {
+            wordLengthCache[len] = [];
+        }
+        wordLengthCache[len].push(word);
+    }
+}
+
+// Initialize the grid with black cells and load from local storage if available
 function generateGrid() {
     const rows = parseInt(document.getElementById("rows").value);
     const cols = parseInt(document.getElementById("columns").value);
 
-    grid = Array.from({ length: rows }, () => Array(cols).fill("#")); // All cells start as black
+    if (isNaN(rows) || isNaN(cols)) {
+        alert("Please enter valid numbers for rows and columns.");
+        return;
+    }
+
+    grid = Array.from({ length: rows }, () => Array(cols).fill("#"));
+    restoreGridFromLocalStorage();
 
     const gridContainer = document.getElementById("gridContainer");
-    gridContainer.innerHTML = ""; // Clear existing grid
+    gridContainer.innerHTML = "";
 
     for (let r = 0; r < rows; r++) {
         const rowDiv = document.createElement("div");
@@ -29,13 +53,10 @@ function generateGrid() {
 
         for (let c = 0; c < cols; c++) {
             const cellDiv = document.createElement("div");
-            cellDiv.classList.add("grid-cell", "black-cell"); // Start each cell as black
+            cellDiv.classList.add("grid-cell", "black-cell");
             cellDiv.dataset.row = r;
             cellDiv.dataset.col = c;
-
-            // Event for toggling cell color or adding a number
             cellDiv.addEventListener("click", () => toggleCellOrAddNumber(cellDiv));
-
             rowDiv.appendChild(cellDiv);
         }
         gridContainer.appendChild(rowDiv);
@@ -48,30 +69,28 @@ function toggleCellOrAddNumber(cell) {
     const col = parseInt(cell.dataset.col);
 
     if (isNumberEntryMode) {
-        // Only allow number entry in white cells without existing numbers
         if (!cell.classList.contains("black-cell") && !cell.textContent) {
             cell.textContent = currentNumber++;
             grid[row][col] = cell.textContent;
+            saveGridToLocalStorage();
         }
     } else {
-        // Toggle between black and white if not in number-entry mode
         if (cell.classList.contains("black-cell")) {
-            cell.classList.remove("black-cell");
-            cell.classList.add("white-cell");
-            cell.textContent = ""; // Clear any number in the cell
+            cell.classList.replace("black-cell", "white-cell");
+            cell.textContent = "";
             grid[row][col] = " ";
         } else if (cell.classList.contains("white-cell")) {
-            cell.classList.remove("white-cell");
-            cell.classList.add("black-cell");
-            cell.textContent = ""; // Clear any number in the cell
+            cell.classList.replace("white-cell", "black-cell");
+            cell.textContent = "";
             grid[row][col] = "#";
         }
+        saveGridToLocalStorage();
     }
 }
 
 // Start number-entry mode, continuing from the highest number on the grid
 function startNumberEntryMode() {
-    currentNumber = getMaxNumberOnGrid() + 1; // Start numbering from the next available number
+    currentNumber = getMaxNumberOnGrid() + 1;
     isNumberEntryMode = true;
     document.getElementById("stopNumberEntryButton").style.display = "inline";
 }
@@ -82,7 +101,7 @@ function stopNumberEntryMode() {
     document.getElementById("stopNumberEntryButton").style.display = "none";
 }
 
-// Get the maximum number currently on the grid to continue numbering in sequence
+// Get the maximum number currently on the grid
 function getMaxNumberOnGrid() {
     let maxNumber = 0;
     for (let row of grid) {
@@ -96,88 +115,89 @@ function getMaxNumberOnGrid() {
     return maxNumber;
 }
 
-// Generate slots based on the grid layout and determine directions
+// Find across and down slots with connected components
 function generateSlots() {
     slots = { across: {}, down: {} };
 
-    // Helper function to get connected cells from a starting point
-    function getConnectedCells(r, c) {
-        const stack = [[r, c]];
-        const visited = new Set();
-        const positions = [];
-        let hasNumber = false;
-
-        while (stack.length > 0) {
-            const [row, col] = stack.pop();
-            const key = `${row},${col}`;
-
-            if (!visited.has(key) && grid[row][col] !== "#") {
-                visited.add(key);
-                positions.push([row, col]);
-
-                const cellNumber = parseInt(grid[row][col]);
-                if (!isNaN(cellNumber)) hasNumber = true;
-
-                // Check adjacent cells (up, down, left, right)
-                if (row > 0) stack.push([row - 1, col]);
-                if (row < grid.length - 1) stack.push([row + 1, col]);
-                if (col > 0) stack.push([row, col - 1]);
-                if (col < grid[row].length - 1) stack.push([row, col + 1]);
-            }
-        }
-        return { positions, hasNumber };
-    }
-
-    // Across Slots
     for (let r = 0; r < grid.length; r++) {
-        let c = 0;
-        while (c < grid[r].length) {
-            if (grid[r][c] !== "#") {
-                const { positions, hasNumber } = getConnectedCells(r, c);
-                const startNumber = parseInt(grid[r][c]);
-                
-                if (positions.length > 1 && hasNumber && !isNaN(startNumber)) {
-                    slots.across[startNumber] = positions;
-                }
-                
-                // Move to the next segment
-                c += positions.length;
-            } else {
-                c++;
-            }
-        }
+        findAcrossSlots(r);
     }
-
-    // Down Slots
     for (let c = 0; c < grid[0].length; c++) {
-        let r = 0;
-        while (r < grid.length) {
-            if (grid[r][c] !== "#") {
-                const { positions, hasNumber } = getConnectedCells(r, c);
-                const startNumber = parseInt(grid[r][c]);
-                
-                if (positions.length > 1 && hasNumber && !isNaN(startNumber)) {
-                    slots.down[startNumber] = positions;
-                }
-                
-                // Move to the next segment
-                r += positions.length;
-            } else {
-                r++;
-            }
-        }
+        findDownSlots(c);
     }
 
     generateConstraints();
-    console.log("Generated Slots:", slots);
+}
+
+// Helper to find across slots
+function findAcrossSlots(row) {
+    let c = 0;
+    while (c < grid[row].length) {
+        if (grid[row][c] !== "#") {
+            const { positions, hasNumber } = getConnectedCells(row, c, "across");
+            if (positions.length > 1 && hasNumber) {
+                const startNumber = grid[row][positions[0][1]];
+                slots.across[startNumber] = positions;
+            }
+            c += positions.length;
+        } else {
+            c++;
+        }
+    }
+}
+
+// Helper to find down slots
+function findDownSlots(col) {
+    let r = 0;
+    while (r < grid.length) {
+        if (grid[r][col] !== "#") {
+            const { positions, hasNumber } = getConnectedCells(r, col, "down");
+            if (positions.length > 1 && hasNumber) {
+                const startNumber = grid[positions[0][0]][col];
+                slots.down[startNumber] = positions;
+            }
+            r += positions.length;
+        } else {
+            r++;
+        }
+    }
+}
+
+// Depth-first search to get connected cells
+function getConnectedCells(r, c, direction) {
+    const stack = [[r, c]];
+    const visited = new Set();
+    const positions = [];
+    let hasNumber = false;
+
+    while (stack.length) {
+        const [row, col] = stack.pop();
+        const key = `${row},${col}`;
+
+        if (!visited.has(key) && grid[row][col] !== "#") {
+            visited.add(key);
+            positions.push([row, col]);
+
+            const cellNumber = parseInt(grid[row][col]);
+            if (!isNaN(cellNumber)) hasNumber = true;
+
+            if (direction === "across") {
+                if (col < grid[row].length - 1) stack.push([row, col + 1]);
+            } else {
+                if (row < grid.length - 1) stack.push([row + 1, col]);
+            }
+        }
+    }
+
+    return { positions, hasNumber };
 }
 
 // Generate constraints between intersecting slots
 function generateConstraints() {
     constraints = {};
 
-    for (let acrossSlot in slots.across) {
-        for (let downSlot in slots.down) {
+    for (const acrossSlot in slots.across) {
+        for (const downSlot in slots.down) {
             const acrossPositions = slots.across[acrossSlot];
             const downPositions = slots.down[downSlot];
 
@@ -196,7 +216,19 @@ function generateConstraints() {
             }
         }
     }
-    console.log("Generated Constraints:", constraints);
+}
+
+// Save the current grid to local storage
+function saveGridToLocalStorage() {
+    localStorage.setItem("crosswordGrid", JSON.stringify(grid));
+}
+
+// Restore grid from local storage
+function restoreGridFromLocalStorage() {
+    const savedGrid = localStorage.getItem("crosswordGrid");
+    if (savedGrid) {
+        grid = JSON.parse(savedGrid);
+    }
 }
 
 // Solve the crossword puzzle using backtracking
@@ -213,7 +245,7 @@ function solveCrossword() {
     }
 }
 
-// Backtracking algorithm with constraint satisfaction
+// Backtracking algorithm with constraint satisfaction and MRV heuristic
 function backtrackingSolve(assignment = {}) {
     if (Object.keys(assignment).length === Object.keys(slots.across).length + Object.keys(slots.down).length) {
         solution = assignment;
@@ -223,7 +255,7 @@ function backtrackingSolve(assignment = {}) {
     const slot = selectUnassignedSlot(assignment);
     const possibleWords = getPossibleWords(slot);
 
-    for (let word of possibleWords) {
+    for (const word of possibleWords) {
         if (isConsistent(slot, word, assignment)) {
             assignment[slot] = word;
 
@@ -235,22 +267,25 @@ function backtrackingSolve(assignment = {}) {
     return false;
 }
 
-// Select the next unassigned slot
+// Select the next unassigned slot using Minimum Remaining Value (MRV) heuristic
 function selectUnassignedSlot(assignment) {
-    return Object.keys(slots.across).concat(Object.keys(slots.down)).find(slot => !assignment[slot]);
+    return Object.keys(slots.across)
+        .concat(Object.keys(slots.down))
+        .filter(slot => !assignment[slot])
+        .sort((a, b) => getPossibleWords(a).length - getPossibleWords(b).length)[0];
 }
 
-// Get possible words that match the slot length
+// Get possible words that match the slot length from the cached word list
 function getPossibleWords(slot) {
     const slotLength = slots.across[slot] ? slots.across[slot].length : slots.down[slot].length;
-    return words.filter(word => word.length === slotLength);
+    return wordLengthCache[slotLength] || [];
 }
 
 // Check if placing a word in a slot is consistent with constraints
 function isConsistent(slot, word, assignment) {
     if (!constraints[slot]) return true;
 
-    for (let constraint of constraints[slot]) {
+    for (const constraint of constraints[slot]) {
         const { slot: otherSlot, pos: [pos1, pos2] } = constraint;
         const otherWord = assignment[otherSlot];
 
@@ -271,6 +306,7 @@ function displaySolution() {
             const cell = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
             if (cell) {
                 cell.textContent = word[idx];
+                cell.classList.add("solved-cell"); // Add a class for solved cells for styling
             }
         });
     }
@@ -281,7 +317,6 @@ function displayWordList() {
     let acrossWords = [];
     let downWords = [];
 
-    // Collect words for across and down, sorted by slot number
     Object.keys(slots.across).sort((a, b) => a - b).forEach(slot => {
         acrossWords.push(`${slot}: ${solution[slot]}`);
     });
@@ -289,7 +324,6 @@ function displayWordList() {
         downWords.push(`${slot}: ${solution[slot]}`);
     });
 
-    // Display the word list in the result area
     const resultArea = document.getElementById("result");
     resultArea.innerHTML = `<h3>Across:</h3><p>${acrossWords.join('<br>')}</p><h3>Down:</h3><p>${downWords.join('<br>')}</p>`;
 }
