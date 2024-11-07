@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crossword Generator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Custom Crossword Generator</h1>
+    </header>
+
+    <main>
+        <!-- Grid Size Selection -->
+        <section id="settings">
+            <label for="gridSize">Select Grid Size:</label>
+            <select id="gridSize">
+                <option value="12x12">12x12</option>
+                <option value="15x7">15x7</option>
+                <option value="10x10">10x10</option>
+            </select>
+            <button onclick="generateGrid()">Generate Grid</button>
+        </section>
+
+        <!-- Grid Display Area -->
+        <section id="crosswordGrid">
+            <h2>Crossword Grid</h2>
+            <div id="gridContainer"></div>
+        </section>
+
+        <!-- Submission Button and Result -->
+        <section id="controls">
+            <button onclick="solveCrossword()">Submit for Solution</button>
+            <p id="result"></p>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Crossword Generator</p>
+    </footer>
+
+    <!-- JavaScript File -->
+    <script src="script.js"></script>
+</body>
+</html>
