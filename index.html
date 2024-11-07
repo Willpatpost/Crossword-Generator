@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crossword Generator</title>
+    <title>Custom Crossword Generator</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,11 +12,11 @@
     </header>
 
     <main>
-        <!-- Grid Size Selection with Separate Row and Column Dropdowns -->
-        <section id="settings">
-            <label for="rows">Select Rows:</label>
-            <select id="rows">
-                <!-- Options from 1 to 20 -->
+        <!-- Grid Size Selection with streamlined layout -->
+        <section id="settings" aria-label="Grid Size Settings">
+            <h2>Select Grid Size</h2>
+            <label for="rows">Rows:</label>
+            <select id="rows" aria-label="Select number of rows">
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
@@ -39,9 +39,8 @@
                 <option value="20">20</option>
             </select>
 
-            <label for="columns">Select Columns:</label>
-            <select id="columns">
-                <!-- Options from 1 to 20 -->
+            <label for="columns">Columns:</label>
+            <select id="columns" aria-label="Select number of columns">
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
@@ -67,25 +66,25 @@
             <button onclick="generateGrid()">Generate Grid</button>
         </section>
 
-        <!-- Buttons for Number Entry Mode -->
-        <section id="number-entry-controls">
-            <button onclick="startNumberEntryMode()">Enter Number</button>
+        <!-- Number Entry Controls -->
+        <section id="number-entry-controls" aria-label="Number Entry Controls">
+            <button onclick="startNumberEntryMode()">Enter Number Mode</button>
             <button onclick="stopNumberEntryMode()" id="stopNumberEntryButton" style="display: none;">Stop Entering Numbers</button>
         </section>
 
-        <!-- Grid Display Area -->
-        <section id="crosswordGrid">
+        <!-- Crossword Grid Display Area -->
+        <section id="crosswordGrid" aria-label="Crossword Grid Display">
             <h2>Crossword Grid</h2>
             <div id="gridContainer"></div>
         </section>
 
-        <!-- Submission and Result -->
-        <section id="controls">
-            <button onclick="solveCrossword()">Submit for Solution</button>
+        <!-- Solution Submission and Control Section -->
+        <section id="controls" aria-label="Solution Controls">
+            <button onclick="solveCrossword()">Solve Crossword</button>
         </section>
 
         <!-- Word List Display Area -->
-        <section id="word-list">
+        <section id="word-list" aria-label="Word List">
             <h3>Word List</h3>
             <div id="result"></div> <!-- The word list will be dynamically inserted here -->
         </section>
