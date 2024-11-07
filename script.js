@@ -1,7 +1,8 @@
-// Placeholder variables for grid, crossword setup, and slots
-let grid = [];  // Stores the current crossword grid
-let words = [];  // Stores the word list for crossword generation
-let slots = {};  // Stores slots for across and down words
+let grid = [];
+let words = [];
+let slots = { across: {}, down: {} };
+let constraints = {}; // Stores constraints between intersecting slots
+let solution = {};    // Stores the solution words for each slot
 
 // Load words from an external file (words.txt)
 async function loadWords() {
@@ -10,7 +11,7 @@ async function loadWords() {
     words = text.split('\n').map(word => word.trim().toUpperCase());
 }
 
-// Initialize the grid with empty cells based on the selected size
+// Initialize the grid based on user-selected size
 function generateGrid() {
     const gridSize = document.getElementById("gridSize").value.split("x");
     const rows = parseInt(gridSize[0]);
@@ -58,7 +59,7 @@ function generateSlots() {
     slots = { across: {}, down: {} };
     let slotId = 1;
 
-    // Generate Across Slots
+    // Across Slots
     for (let r = 0; r < grid.length; r++) {
         let c = 0;
         while (c < grid[r].length) {
@@ -68,7 +69,7 @@ function generateSlots() {
                     positions.push([r, c]);
                     c++;
                 }
-                if (positions.length > 1) {  // Only consider slots with length > 1
+                if (positions.length > 1) {
                     slots.across[slotId + "A"] = positions;
                     slotId++;
                 }
@@ -78,7 +79,7 @@ function generateSlots() {
         }
     }
 
-    // Generate Down Slots
+    // Down Slots
     for (let c = 0; c < grid[0].length; c++) {
         let r = 0;
         while (r < grid.length) {
@@ -98,21 +99,102 @@ function generateSlots() {
         }
     }
 
-    console.log("Generated Slots:", slots);  // For debugging
+    generateConstraints();
+    console.log("Generated Slots:", slots);
+}
+
+// Generate constraints between intersecting slots
+function generateConstraints() {
+    constraints = {};
+
+    // Find intersections between across and down slots
+    for (let acrossSlot in slots.across) {
+        for (let downSlot in slots.down) {
+            const acrossPositions = slots.across[acrossSlot];
+            const downPositions = slots.down[downSlot];
+
+            for (let aIdx = 0; aIdx < acrossPositions.length; aIdx++) {
+                for (let dIdx = 0; dIdx < downPositions.length; dIdx++) {
+                    const [aRow, aCol] = acrossPositions[aIdx];
+                    const [dRow, dCol] = downPositions[dIdx];
+
+                    // If positions match, there's an intersection
+                    if (aRow === dRow && aCol === dCol) {
+                        if (!constraints[acrossSlot]) constraints[acrossSlot] = [];
+                        if (!constraints[downSlot]) constraints[downSlot] = [];
+                        constraints[acrossSlot].push({ slot: downSlot, pos: [aIdx, dIdx] });
+                        constraints[downSlot].push({ slot: acrossSlot, pos: [dIdx, aIdx] });
+                    }
+                }
+            }
+        }
+    }
+
+    console.log("Generated Constraints:", constraints);
 }
 
 // Solve the crossword puzzle using backtracking
 function solveCrossword() {
-    generateSlots();  // Generate slots each time a solution is requested
+    generateSlots();
 
     const result = backtrackingSolve();
-
     if (result) {
         displaySolution();
         document.getElementById("result").textContent = "Crossword solved!";
     } else {
         document.getElementById("result").textContent = "No possible solution.";
     }
+}
+
+// Backtracking algorithm with constraint satisfaction
+function backtrackingSolve(assignment = {}) {
+    // Base case: if all slots are assigned, return the solution
+    if (Object.keys(assignment).length === Object.keys(slots.across).length + Object.keys(slots.down).length) {
+        solution = assignment;
+        return true;
+    }
+
+    // Select an unassigned slot
+    const slot = selectUnassignedSlot(assignment);
+    const possibleWords = getPossibleWords(slot);
+
+    for (let word of possibleWords) {
+        if (isConsistent(slot, word, assignment)) {
+            assignment[slot] = word;
+
+            if (backtrackingSolve(assignment)) return true;
+
+            delete assignment[slot]; // Remove assignment if not successful
+        }
+    }
+    return false;
+}
+
+// Select the next unassigned slot
+function selectUnassignedSlot(assignment) {
+    return Object.keys(slots.across).concat(Object.keys(slots.down)).find(slot => !assignment[slot]);
+}
+
+// Get possible words that match the slot length
+function getPossibleWords(slot) {
+    const slotLength = slots.across[slot] ? slots.across[slot].length : slots.down[slot].length;
+    return words.filter(word => word.length === slotLength);
+}
+
+// Check if placing a word in a slot is consistent with constraints
+function isConsistent(slot, word, assignment) {
+    if (!constraints[slot]) return true;
+
+    for (let constraint of constraints[slot]) {
+        const { slot: otherSlot, pos: [pos1, pos2] } = constraint;
+        const otherWord = assignment[otherSlot];
+
+        // If the intersecting slot already has a word assigned, enforce consistency
+        if (otherWord && word[pos1] !== otherWord[pos2]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // Display the solution on the grid
@@ -128,12 +210,6 @@ function displaySolution() {
             }
         });
     }
-}
-
-// Placeholder function for backtracking
-function backtrackingSolve() {
-    // Implement AC-3, forward checking, MRV heuristic, etc., here
-    return true;  // Placeholder return value
 }
 
 // Initialize word list on page load
