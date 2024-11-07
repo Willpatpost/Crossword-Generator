@@ -1,9 +1,7 @@
-// Placeholder variables for grid and crossword setup
-let grid = [];            // Stores the current crossword grid
-let words = [];           // Stores the word list for crossword generation
-let slots = {};           // Stores the slots for across and down words
-let constraints = {};     // Stores constraints between slots
-let solution = {};        // Stores the solved crossword words
+// Placeholder variables for grid, crossword setup, and slots
+let grid = [];  // Stores the current crossword grid
+let words = [];  // Stores the word list for crossword generation
+let slots = {};  // Stores slots for across and down words
 
 // Load words from an external file (words.txt)
 async function loadWords() {
@@ -23,7 +21,6 @@ function generateGrid() {
     const gridContainer = document.getElementById("gridContainer");
     gridContainer.innerHTML = ""; // Clear existing grid
 
-    // Generate HTML grid structure
     for (let r = 0; r < rows; r++) {
         const rowDiv = document.createElement("div");
         rowDiv.classList.add("grid-row");
@@ -34,7 +31,6 @@ function generateGrid() {
             cellDiv.dataset.row = r;
             cellDiv.dataset.col = c;
 
-            // Add click event for toggling cells between white and black
             cellDiv.addEventListener("click", () => toggleCell(cellDiv));
 
             rowDiv.appendChild(cellDiv);
@@ -59,22 +55,58 @@ function toggleCell(cell) {
 
 // Generate slots based on the grid layout
 function generateSlots() {
-    slots = {}; // Reset slots
+    slots = { across: {}, down: {} };
+    let slotId = 1;
 
-    // Example logic to generate across and down slots
-    // (Additional complexity to follow based on the grid layout)
+    // Generate Across Slots
+    for (let r = 0; r < grid.length; r++) {
+        let c = 0;
+        while (c < grid[r].length) {
+            if (grid[r][c] !== "#") {
+                let positions = [];
+                while (c < grid[r].length && grid[r][c] !== "#") {
+                    positions.push([r, c]);
+                    c++;
+                }
+                if (positions.length > 1) {  // Only consider slots with length > 1
+                    slots.across[slotId + "A"] = positions;
+                    slotId++;
+                }
+            } else {
+                c++;
+            }
+        }
+    }
 
-    // Code to populate slots object with slot IDs, positions, and lengths
+    // Generate Down Slots
+    for (let c = 0; c < grid[0].length; c++) {
+        let r = 0;
+        while (r < grid.length) {
+            if (grid[r][c] !== "#") {
+                let positions = [];
+                while (r < grid.length && grid[r][c] !== "#") {
+                    positions.push([r, c]);
+                    r++;
+                }
+                if (positions.length > 1) {
+                    slots.down[slotId + "D"] = positions;
+                    slotId++;
+                }
+            } else {
+                r++;
+            }
+        }
+    }
+
+    console.log("Generated Slots:", slots);  // For debugging
 }
 
 // Solve the crossword puzzle using backtracking
 function solveCrossword() {
-    // Basic backtracking algorithm to place words in the slots
-    // Detailed implementation similar to Python’s backtracking function
+    generateSlots();  // Generate slots each time a solution is requested
 
     const result = backtrackingSolve();
 
-    // Update grid or display message based on solution result
     if (result) {
         displaySolution();
         document.getElementById("result").textContent = "Crossword solved!";
@@ -87,7 +119,7 @@ function solveCrossword() {
 function displaySolution() {
     for (const slot in solution) {
         const word = solution[slot];
-        const positions = slots[slot];
+        const positions = slots[slot.includes("A") ? "across" : "down"][slot];
 
         positions.forEach(([row, col], idx) => {
             const cell = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
@@ -98,10 +130,10 @@ function displaySolution() {
     }
 }
 
-// Helper functions for backtracking, constraints, etc., to be expanded
+// Placeholder function for backtracking
 function backtrackingSolve() {
-    // Implement AC-3 consistency, forward checking, MRV heuristic, etc.
-    return true; // Placeholder for now
+    // Implement AC-3, forward checking, MRV heuristic, etc., here
+    return true;  // Placeholder return value
 }
 
 // Initialize word list on page load
