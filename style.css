@@ -33,7 +33,7 @@ h1 {
     margin-bottom: 20px;
 }
 
-/* Individual grid cells */
+/* Basic cell styling */
 .grid-cell {
     width: 30px;
     height: 30px;
@@ -45,18 +45,18 @@ h1 {
     font-weight: bold;
     color: #333;
     cursor: pointer;
+    background-color: black; /* Ensure all cells start as black */
+}
+
+/* Styling for blacked-out cells */
+.black-cell {
+    background-color: black;
+    color: black;
 }
 
 /* Styling for grid rows */
 .grid-row {
     display: flex;
-}
-
-/* Blacked-out cells */
-.black-cell {
-    background-color: #333;
-    color: #333;
-    cursor: default;
 }
 
 /* Settings and controls styling */
