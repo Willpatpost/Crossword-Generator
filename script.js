@@ -69,16 +69,32 @@ function toggleCellOrAddNumber(cell) {
     }
 }
 
-// Start and stop number-entry mode
+// Start number-entry mode, continuing from the highest number on the grid
 function startNumberEntryMode() {
+    // Find the highest current number on the grid
+    currentNumber = getMaxNumberOnGrid() + 1;
     isNumberEntryMode = true;
-    currentNumber = 1;
     document.getElementById("stopNumberEntryButton").style.display = "inline";
 }
 
+// Stop number-entry mode
 function stopNumberEntryMode() {
     isNumberEntryMode = false;
     document.getElementById("stopNumberEntryButton").style.display = "none";
+}
+
+// Get the maximum number currently on the grid to continue numbering in sequence
+function getMaxNumberOnGrid() {
+    let maxNumber = 0;
+    for (let row of grid) {
+        for (let cell of row) {
+            const cellNumber = parseInt(cell);
+            if (!isNaN(cellNumber) && cellNumber > maxNumber) {
+                maxNumber = cellNumber;
+            }
+        }
+    }
+    return maxNumber;
 }
 
 // Generate slots based on the grid layout and determine directions
