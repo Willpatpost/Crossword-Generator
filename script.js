@@ -120,7 +120,7 @@ function generateSlots() {
     console.log("Generated Slots:", slots);
 }
 
-// Generate constraints between intersecting slots (unchanged)
+// Generate constraints between intersecting slots
 function generateConstraints() {
     constraints = {};
 
@@ -148,7 +148,7 @@ function generateConstraints() {
     console.log("Generated Constraints:", constraints);
 }
 
-// Solve the crossword puzzle using backtracking (unchanged)
+// Solve the crossword puzzle using backtracking
 function solveCrossword() {
     generateSlots();
 
@@ -161,7 +161,55 @@ function solveCrossword() {
     }
 }
 
-// Display solution on the grid (unchanged)
+// Backtracking algorithm with constraint satisfaction
+function backtrackingSolve(assignment = {}) {
+    if (Object.keys(assignment).length === Object.keys(slots.across).length + Object.keys(slots.down).length) {
+        solution = assignment;
+        return true;
+    }
+
+    const slot = selectUnassignedSlot(assignment);
+    const possibleWords = getPossibleWords(slot);
+
+    for (let word of possibleWords) {
+        if (isConsistent(slot, word, assignment)) {
+            assignment[slot] = word;
+
+            if (backtrackingSolve(assignment)) return true;
+
+            delete assignment[slot];
+        }
+    }
+    return false;
+}
+
+// Select the next unassigned slot
+function selectUnassignedSlot(assignment) {
+    return Object.keys(slots.across).concat(Object.keys(slots.down)).find(slot => !assignment[slot]);
+}
+
+// Get possible words that match the slot length
+function getPossibleWords(slot) {
+    const slotLength = slots.across[slot] ? slots.across[slot].length : slots.down[slot].length;
+    return words.filter(word => word.length === slotLength);
+}
+
+// Check if placing a word in a slot is consistent with constraints
+function isConsistent(slot, word, assignment) {
+    if (!constraints[slot]) return true;
+
+    for (let constraint of constraints[slot]) {
+        const { slot: otherSlot, pos: [pos1, pos2] } = constraint;
+        const otherWord = assignment[otherSlot];
+
+        if (otherWord && word[pos1] !== otherWord[pos2]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Display the solution on the grid
 function displaySolution() {
     for (const slot in solution) {
         const word = solution[slot];
@@ -176,5 +224,5 @@ function displaySolution() {
     }
 }
 
-// Load words on page load
+// Initialize word list on page load
 window.onload = loadWords;
