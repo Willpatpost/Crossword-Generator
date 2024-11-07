@@ -6,7 +6,7 @@ let solution = {};
 
 // Load words from an external file
 async function loadWords() {
-    const response = await fetch('Data/words.txt');
+    const response = await fetch('Data/Words.txt');
     const text = await response.text();
     words = text.split('\n').map(word => word.trim().toUpperCase());
 }
