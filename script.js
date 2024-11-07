@@ -11,11 +11,10 @@ async function loadWords() {
     words = text.split('\n').map(word => word.trim().toUpperCase());
 }
 
-// Initialize the grid with empty cells based on selected size
+// Initialize the grid with empty cells based on selected rows and columns
 function generateGrid() {
-    const gridSize = document.getElementById("gridSize").value.split("x");
-    const rows = parseInt(gridSize[0]);
-    const cols = parseInt(gridSize[1]);
+    const rows = parseInt(document.getElementById("rows").value);
+    const cols = parseInt(document.getElementById("columns").value);
 
     grid = Array.from({ length: rows }, () => Array(cols).fill(" "));
 
