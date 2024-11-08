@@ -7,6 +7,12 @@ let isNumberEntryMode = false;
 let currentNumber = 1;
 let wordLengthCache = {};
 
+// Event listeners for buttons
+document.getElementById("generateGridButton").addEventListener("click", generateGrid);
+document.getElementById("startNumberEntryButton").addEventListener("click", startNumberEntryMode);
+document.getElementById("stopNumberEntryButton").addEventListener("click", stopNumberEntryMode);
+document.getElementById("solveCrosswordButton").addEventListener("click", solveCrossword);
+
 // Load words from an external file and cache by word length
 async function loadWords() {
     try {
@@ -214,12 +220,6 @@ function generateConstraints() {
         }
     }
 }
-
-// Event listeners for buttons
-document.getElementById("generateGridButton").addEventListener("click", generateGrid);
-document.getElementById("startNumberEntryButton").addEventListener("click", startNumberEntryMode);
-document.getElementById("stopNumberEntryButton").addEventListener("click", stopNumberEntryMode);
-document.getElementById("solveCrosswordButton").addEventListener("click", solveCrossword);
 
 // Display loading spinner during crossword solving
 async function solveCrossword() {
