@@ -122,14 +122,20 @@ function getMaxNumberOnGrid() {
 function generateSlots() {
     slots = { across: {}, down: {} };
 
+    console.log("Generating across slots...");
     for (let r = 0; r < grid.length; r++) {
         findAcrossSlots(r);
     }
+    console.log("Across slots found:", slots.across);
+
+    console.log("Generating down slots...");
     for (let c = 0; c < grid[0].length; c++) {
         findDownSlots(c);
     }
+    console.log("Down slots found:", slots.down);
 
     generateConstraints();
+    console.log("Generated constraints:", constraints);
 }
 
 // Helper to find across slots
@@ -141,6 +147,7 @@ function findAcrossSlots(row) {
             if (positions.length > 1 && hasNumber) {
                 const startNumber = grid[row][positions[0][1]];
                 slots.across[startNumber] = positions;
+                console.log(`Across slot found: Start number ${startNumber} at row ${row} with positions`, positions);
             }
             c += positions.length;
         } else {
@@ -158,6 +165,7 @@ function findDownSlots(col) {
             if (positions.length > 1 && hasNumber) {
                 const startNumber = grid[positions[0][0]][col];
                 slots.down[startNumber] = positions;
+                console.log(`Down slot found: Start number ${startNumber} at column ${col} with positions`, positions);
             }
             r += positions.length;
         } else {
@@ -214,16 +222,21 @@ function generateConstraints() {
                         if (!constraints[downSlot]) constraints[downSlot] = [];
                         constraints[acrossSlot].push({ slot: downSlot, pos: [aIdx, dIdx] });
                         constraints[downSlot].push({ slot: acrossSlot, pos: [dIdx, aIdx] });
+                        console.log(`Constraint added between slots ${acrossSlot} and ${downSlot} at position (${aRow}, ${aCol})`);
                     }
                 }
             }
         }
     }
+    console.log("Final constraints:", constraints);
 }
 
 // Display loading spinner during crossword solving
 async function solveCrossword() {
     console.log("Starting to solve crossword...");
+    generateSlots(); // Ensure slots and constraints are generated before solving
+    console.log("Generated slots:", slots);
+
     document.getElementById("loadingSpinner").style.display = "block";
     document.getElementById("result").textContent = "Solving...";
 
