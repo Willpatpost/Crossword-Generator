@@ -223,18 +223,22 @@ function generateConstraints() {
 
 // Display loading spinner during crossword solving
 async function solveCrossword() {
+    console.log("Starting to solve crossword...");
     document.getElementById("loadingSpinner").style.display = "block";
     document.getElementById("result").textContent = "Solving...";
 
     setTimeout(() => {
+        console.log("Calling backtrackingSolve...");
         const result = backtrackingSolve();
         document.getElementById("loadingSpinner").style.display = "none";
         
         if (result) {
+            console.log("Solution found, displaying solution...");
             displaySolution();
             document.getElementById("result").textContent = "Crossword solved!";
             displayWordList();
         } else {
+            console.log("No possible solution found.");
             document.getElementById("result").textContent = "No possible solution.";
         }
     }, 10);
@@ -242,23 +246,37 @@ async function solveCrossword() {
 
 // Backtracking algorithm with constraint satisfaction
 function backtrackingSolve(assignment = {}) {
+    console.log("Running backtrackingSolve with current assignment:", assignment);
+
     if (Object.keys(assignment).length === Object.keys(slots.across).length + Object.keys(slots.down).length) {
         solution = assignment;
+        console.log("Assignment complete, solution found:", solution);
         return true;
     }
 
     const slot = selectUnassignedSlot(assignment);
+    if (!slot) {
+        console.log("No unassigned slot found, returning false.");
+        return false;
+    }
+
+    console.log("Selected slot:", slot);
     const possibleWords = getPossibleWords(slot);
+    console.log("Possible words for slot", slot, ":", possibleWords);
 
     for (const word of possibleWords) {
+        console.log("Trying word:", word);
         if (isConsistent(slot, word, assignment)) {
             assignment[slot] = word;
+            console.log("Word fits, updated assignment:", assignment);
 
             if (backtrackingSolve(assignment)) return true;
 
+            console.log("Backtracking, removing word from assignment:", word);
             delete assignment[slot];
         }
     }
+    console.log("No valid words for slot", slot, ", backtracking...");
     return false;
 }
 
