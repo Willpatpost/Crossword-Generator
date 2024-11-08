@@ -1,12 +1,13 @@
 let grid = [];
 let words = [];
-let slots = { across: {}, down: {} };
+let slots = {};
 let constraints = {};
 let solution = {};
 let isNumberEntryMode = false;
 let currentNumber = 1;
 let wordLengthCache = {};
 let domains = {};
+let cellContents = {};
 
 // Event listeners for buttons
 document.getElementById("generateGridButton").addEventListener("click", generateGrid);
@@ -29,7 +30,7 @@ async function loadWords() {
     }
 }
 
-// Cache words by length to optimize getPossibleWords
+// Cache words by length to optimize domain setup
 function cacheWordsByLength() {
     wordLengthCache = {};
     for (const word of words) {
@@ -69,7 +70,7 @@ function generateGrid() {
     }
 }
 
-// Toggle cell between black and white, or add a number in number-entry mode
+// Toggle cell between black and white, add numbers, or pre-filled letters
 function toggleCellOrAddNumber(cell) {
     const row = parseInt(cell.dataset.row);
     const col = parseInt(cell.dataset.col);
@@ -81,20 +82,35 @@ function toggleCellOrAddNumber(cell) {
         } else {
             alert("Number can only be placed on empty white cells.");
         }
-    } else {
-        if (cell.classList.contains("black-cell")) {
-            cell.classList.replace("black-cell", "white-cell");
-            cell.textContent = "";
-            grid[row][col] = " ";
-        } else if (cell.classList.contains("white-cell")) {
+    } else if (cell.classList.contains("black-cell")) {
+        cell.classList.replace("black-cell", "white-cell");
+        cell.textContent = "";
+        grid[row][col] = " ";
+    } else if (cell.classList.contains("white-cell")) {
+        // Toggle between white cell and pre-filled letter mode
+        let letter = prompt("Enter a letter (or leave blank to toggle back to black):").toUpperCase();
+        if (letter) {
+            if (/^[A-Z]$/.test(letter)) {
+                cell.textContent = letter;
+                cell.classList.add("prefilled-cell");
+                grid[row][col] = letter;
+            } else {
+                alert("Please enter a single letter A-Z.");
+            }
+        } else {
             cell.classList.replace("white-cell", "black-cell");
             cell.textContent = "";
             grid[row][col] = "#";
         }
+    } else if (cell.classList.contains("prefilled-cell")) {
+        cell.classList.remove("prefilled-cell");
+        cell.classList.add("white-cell");
+        cell.textContent = "";
+        grid[row][col] = " ";
     }
 }
 
-// Start number-entry mode, continuing from the highest number on the grid
+// Start number-entry mode
 function startNumberEntryMode() {
     currentNumber = getMaxNumberOnGrid() + 1;
     isNumberEntryMode = true;
@@ -119,119 +135,150 @@ function getMaxNumberOnGrid() {
     return maxNumber;
 }
 
-// Find across and down slots with connected components
+// Generate slots and handle pre-filled letters
 function generateSlots() {
-    slots = { across: {}, down: {} };
+    slots = {};
     domains = {};
+    cellContents = {};
 
-    for (let r = 0; r < grid.length; r++) {
-        findAcrossSlots(r);
+    const rows = grid.length;
+    const cols = grid[0].length;
+    let slotId = 1;
+
+    // Identify cells with pre-filled letters
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const cell = grid[r][c];
+            if (/^[A-Z]$/.test(cell)) {
+                cellContents[`${r},${c}`] = cell;
+            } else if (cell !== "#" && cell.trim() !== "") {
+                cellContents[`${r},${c}`] = null;
+            }
+        }
     }
 
-    for (let c = 0; c < grid[0].length; c++) {
-        findDownSlots(c);
+    // Generate across slots
+    for (let r = 0; r < rows; r++) {
+        let c = 0;
+        while (c < cols) {
+            const cell = grid[r][c];
+            if (cell !== "#") {
+                if (c === 0 || grid[r][c - 1] === "#") {
+                    let slotLength = 0;
+                    let positions = [];
+                    let slotNumber = /^[0-9]+$/.test(cell) ? cell : null;
+                    let startC = c;
+                    while (c < cols && grid[r][c] !== "#") {
+                        positions.push([r, c]);
+                        slotLength++;
+                        c++;
+                    }
+                    if (slotLength >= 2) {
+                        const slotName = slotNumber ? `${slotNumber}ACROSS` : `S${slotId++}ACROSS`;
+                        slots[slotName] = positions;
+                    }
+                } else {
+                    c++;
+                }
+            } else {
+                c++;
+            }
+        }
+    }
+
+    // Generate down slots
+    for (let c = 0; c < cols; c++) {
+        let r = 0;
+        while (r < rows) {
+            const cell = grid[r][c];
+            if (cell !== "#") {
+                if (r === 0 || grid[r - 1][c] === "#") {
+                    let slotLength = 0;
+                    let positions = [];
+                    let slotNumber = /^[0-9]+$/.test(cell) ? cell : null;
+                    let startR = r;
+                    while (r < rows && grid[r][c] !== "#") {
+                        positions.push([r, c]);
+                        slotLength++;
+                        r++;
+                    }
+                    if (slotLength >= 2) {
+                        const slotName = slotNumber ? `${slotNumber}DOWN` : `S${slotId++}DOWN`;
+                        slots[slotName] = positions;
+                    }
+                } else {
+                    r++;
+                }
+            } else {
+                r++;
+            }
+        }
     }
 
     generateConstraints();
     setupDomains();
 }
 
-// Helper to find across slots
-function findAcrossSlots(row) {
-    let c = 0;
-    while (c < grid[row].length) {
-        if (grid[row][c] !== "#") {
-            const { positions, hasNumber } = getConnectedCells(row, c, "across");
-            if (positions.length > 1 && hasNumber) {
-                const startNumber = `A${grid[row][positions[0][1]]}`;
-                slots.across[startNumber] = positions;
-            }
-            c += positions.length;
-        } else {
-            c++;
-        }
-    }
-}
-
-// Helper to find down slots
-function findDownSlots(col) {
-    let r = 0;
-    while (r < grid.length) {
-        if (grid[r][col] !== "#") {
-            const { positions, hasNumber } = getConnectedCells(r, col, "down");
-            if (positions.length > 1 && hasNumber) {
-                const startNumber = `D${grid[positions[0][0]][col]}`;
-                slots.down[startNumber] = positions;
-            }
-            r += positions.length;
-        } else {
-            r++;
-        }
-    }
-}
-
-// Get connected cells in a direction
-function getConnectedCells(r, c, direction) {
-    const positions = [];
-    let hasNumber = false;
-
-    while (r < grid.length && c < grid[0].length && grid[r][c] !== "#") {
-        positions.push([r, c]);
-        const cellNumber = parseInt(grid[r][c]);
-        if (!isNaN(cellNumber)) hasNumber = true;
-
-        if (direction === "across") {
-            c++;
-        } else {
-            r++;
-        }
-    }
-
-    return { positions, hasNumber };
-}
-
-// Generate constraints between intersecting slots
+// Generate constraints based on slot intersections
 function generateConstraints() {
     constraints = {};
+    let positionMap = {};
 
-    for (const [acrossSlot, acrossPositions] of Object.entries(slots.across)) {
-        for (const [downSlot, downPositions] of Object.entries(slots.down)) {
-            for (let aIdx = 0; aIdx < acrossPositions.length; aIdx++) {
-                for (let dIdx = 0; dIdx < downPositions.length; dIdx++) {
-                    const [aRow, aCol] = acrossPositions[aIdx];
-                    const [dRow, dCol] = downPositions[dIdx];
+    for (const [slot, positions] of Object.entries(slots)) {
+        positions.forEach((pos, idx) => {
+            const key = `${pos[0]},${pos[1]}`;
+            if (!positionMap[key]) positionMap[key] = [];
+            positionMap[key].push({ slot, idx });
+        });
+    }
 
-                    if (aRow === dRow && aCol === dCol) {
-                        if (!constraints[acrossSlot]) constraints[acrossSlot] = [];
-                        if (!constraints[downSlot]) constraints[downSlot] = [];
-                        constraints[acrossSlot].push({ slot: downSlot, pos: [aIdx, dIdx] });
-                        constraints[downSlot].push({ slot: acrossSlot, pos: [dIdx, aIdx] });
-                    }
+    for (const overlaps of Object.values(positionMap)) {
+        if (overlaps.length > 1) {
+            for (let i = 0; i < overlaps.length; i++) {
+                for (let j = i + 1; j < overlaps.length; j++) {
+                    const { slot: slot1, idx: idx1 } = overlaps[i];
+                    const { slot: slot2, idx: idx2 } = overlaps[j];
+
+                    if (!constraints[slot1]) constraints[slot1] = {};
+                    if (!constraints[slot2]) constraints[slot2] = {};
+
+                    if (!constraints[slot1][slot2]) constraints[slot1][slot2] = [];
+                    if (!constraints[slot2][slot1]) constraints[slot2][slot1] = [];
+
+                    constraints[slot1][slot2].push([idx1, idx2]);
+                    constraints[slot2][slot1].push([idx2, idx1]);
                 }
             }
         }
     }
 }
 
-// Set up domains based on word length and constraints
+// Set up domains for each slot, considering pre-filled letters
 function setupDomains() {
     domains = {};
-    for (const slot in slots.across) {
-        const length = slots.across[slot].length;
-        domains[slot] = wordLengthCache[length] ? [...wordLengthCache[length]] : [];
-    }
-    for (const slot in slots.down) {
-        const length = slots.down[slot].length;
-        domains[slot] = wordLengthCache[length] ? [...wordLengthCache[length]] : [];
+    for (const [slot, positions] of Object.entries(slots)) {
+        const length = positions.length;
+        const preFilled = {};
+        positions.forEach(([r, c], idx) => {
+            const key = `${r},${c}`;
+            if (cellContents[key]) {
+                preFilled[idx] = cellContents[key];
+            }
+        });
+
+        const possibleWords = wordLengthCache[length] ? wordLengthCache[length] : [];
+        domains[slot] = possibleWords.filter(word => {
+            return Object.entries(preFilled).every(([idx, letter]) => word[idx] === letter);
+        });
     }
 }
 
-// Enforce arc consistency using AC-3 algorithm
+// AC-3 Algorithm
 function ac3() {
     const queue = [];
-    for (const var1 in constraints) {
-        for (const constraint of constraints[var1]) {
-            queue.push([var1, constraint.slot]);
+    for (const [var1, neighbors] of Object.entries(constraints)) {
+        for (const var2 of Object.keys(neighbors)) {
+            queue.push([var1, var2]);
         }
     }
 
@@ -239,10 +286,8 @@ function ac3() {
         const [var1, var2] = queue.shift();
         if (revise(var1, var2)) {
             if (!domains[var1].length) return false;
-            for (const constraint of constraints[var1]) {
-                if (constraint.slot !== var2) {
-                    queue.push([constraint.slot, var1]);
-                }
+            for (const neighbor of Object.keys(constraints[var1])) {
+                if (neighbor !== var2) queue.push([neighbor, var1]);
             }
         }
     }
@@ -251,101 +296,90 @@ function ac3() {
 
 function revise(var1, var2) {
     let revised = false;
-    const pairs = constraints[var1].filter(constraint => constraint.slot === var2);
+    const overlaps = constraints[var1][var2];
 
     const newDomain = [];
-    for (const x of domains[var1]) {
-        let satisfiesConstraint = false;
-        for (const y of domains[var2]) {
+    for (const word1 of domains[var1]) {
+        let satisfies = false;
+        for (const word2 of domains[var2]) {
             let match = true;
-            for (const { pos: [i, j] } of pairs) {
-                if (x[i] !== y[j]) {
+            for (const [idx1, idx2] of overlaps) {
+                if (word1[idx1] !== word2[idx2]) {
                     match = false;
                     break;
                 }
             }
             if (match) {
-                satisfiesConstraint = true;
+                satisfies = true;
                 break;
             }
         }
-        if (satisfiesConstraint) {
-            newDomain.push(x);
+        if (satisfies) {
+            newDomain.push(word1);
         } else {
             revised = true;
         }
     }
+
     if (revised) {
         domains[var1] = newDomain;
     }
     return revised;
 }
 
-// Backtracking algorithm with constraint satisfaction and heuristics
+// Backtracking Search with Heuristics
 function backtrackingSolve(assignment = {}) {
     if (Object.keys(assignment).length === Object.keys(domains).length) {
         solution = assignment;
         return true;
     }
 
-    const slot = selectUnassignedSlot(assignment);
-    for (const word of orderDomainValues(slot, assignment)) {
-        if (isConsistent(slot, word, assignment)) {
-            assignment[slot] = word;
-            const backupDomains = {};
-            const inferences = forwardCheck(slot, word, assignment, backupDomains);
+    const varToAssign = selectUnassignedVariable(assignment);
+    for (const value of orderDomainValues(varToAssign, assignment)) {
+        if (isConsistent(varToAssign, value, assignment)) {
+            assignment[varToAssign] = value;
+            const inferences = forwardCheck(varToAssign, value, assignment);
             if (inferences !== false) {
-                if (backtrackingSolve(assignment)) return true;
+                const result = backtrackingSolve(assignment);
+                if (result) return result;
             }
-            restoreDomains(backupDomains);
-            delete assignment[slot];
+            delete assignment[varToAssign];
+            restoreDomains(inferences);
         }
     }
     return false;
 }
 
-// Check if assigning a word to a slot is consistent
-function isConsistent(slot, word, assignment) {
-    for (const neighbor of constraints[slot] || []) {
-        const neighborSlot = neighbor.slot;
-        if (neighborSlot in assignment) {
-            const neighborWord = assignment[neighborSlot];
-            if (!wordsMatch(slot, word, neighborSlot, neighborWord)) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
+// MRV and Degree Heuristic
+function selectUnassignedVariable(assignment) {
+    const unassignedVars = Object.keys(domains).filter(v => !(v in assignment));
+    unassignedVars.sort((a, b) => {
+        const lenA = domains[a].length;
+        const lenB = domains[b].length;
+        if (lenA !== lenB) return lenA - lenB;
 
-// Select unassigned slot with MRV and Degree heuristic
-function selectUnassignedSlot(assignment) {
-    const unassignedSlots = Object.keys(domains).filter(slot => !(slot in assignment));
-    unassignedSlots.sort((a, b) => {
-        const domainSizeA = domains[a].length;
-        const domainSizeB = domains[b].length;
-        if (domainSizeA !== domainSizeB) return domainSizeA - domainSizeB;
-
-        const degreeA = constraints[a] ? constraints[a].length : 0;
-        const degreeB = constraints[b] ? constraints[b].length : 0;
+        const degreeA = constraints[a] ? Object.keys(constraints[a]).length : 0;
+        const degreeB = constraints[b] ? Object.keys(constraints[b]).length : 0;
         return degreeB - degreeA;
     });
-    return unassignedSlots[0];
+    return unassignedVars[0];
 }
 
-// Least Constraining Value ordering
-function orderDomainValues(slot, assignment) {
-    return domains[slot].slice().sort((wordA, wordB) => {
-        return countConflicts(slot, wordA, assignment) - countConflicts(slot, wordB, assignment);
+// Least Constraining Value Heuristic
+function orderDomainValues(variable, assignment) {
+    return domains[variable].slice().sort((a, b) => {
+        const conflictsA = countConflicts(variable, a, assignment);
+        const conflictsB = countConflicts(variable, b, assignment);
+        return conflictsA - conflictsB;
     });
 }
 
-function countConflicts(slot, word, assignment) {
+function countConflicts(variable, value, assignment) {
     let conflicts = 0;
-    for (const neighbor of constraints[slot] || []) {
-        if (!(neighbor.slot in assignment)) {
-            for (const otherWord of domains[neighbor.slot]) {
-                if (!wordsMatch(slot, word, neighbor.slot, otherWord)) {
+    for (const neighbor in constraints[variable]) {
+        if (!(neighbor in assignment)) {
+            for (const neighborValue of domains[neighbor]) {
+                if (!wordsMatch(variable, value, neighbor, neighborValue)) {
                     conflicts++;
                 }
             }
@@ -354,26 +388,10 @@ function countConflicts(slot, word, assignment) {
     return conflicts;
 }
 
-function wordsMatch(slot1, word1, slot2, word2) {
-    const overlappingPositions = constraints[slot1].filter(c => c.slot === slot2);
-    for (const { pos: [i, j] } of overlappingPositions) {
-        if (word1[i] !== word2[j]) return false;
-    }
-    return true;
-}
-
-// Forward checking after assigning a word
-function forwardCheck(slot, word, assignment, backupDomains) {
-    for (const neighbor of constraints[slot] || []) {
-        const neighborSlot = neighbor.slot;
-        if (!(neighborSlot in assignment)) {
-            if (!backupDomains[neighborSlot]) {
-                backupDomains[neighborSlot] = domains[neighborSlot].slice();
-            }
-            domains[neighborSlot] = domains[neighborSlot].filter(otherWord => {
-                return wordsMatch(slot, word, neighborSlot, otherWord);
-            });
-            if (!domains[neighborSlot].length) {
+function isConsistent(variable, value, assignment) {
+    for (const neighbor in constraints[variable]) {
+        if (neighbor in assignment) {
+            if (!wordsMatch(variable, value, neighbor, assignment[neighbor])) {
                 return false;
             }
         }
@@ -381,10 +399,34 @@ function forwardCheck(slot, word, assignment, backupDomains) {
     return true;
 }
 
-// Restore domains after backtracking
-function restoreDomains(backupDomains) {
-    for (const slot in backupDomains) {
-        domains[slot] = backupDomains[slot];
+function wordsMatch(var1, word1, var2, word2) {
+    const overlaps = constraints[var1][var2];
+    for (const [idx1, idx2] of overlaps) {
+        if (word1[idx1] !== word2[idx2]) return false;
+    }
+    return true;
+}
+
+// Forward Checking
+function forwardCheck(variable, value, assignment) {
+    const inferences = {};
+    for (const neighbor in constraints[variable]) {
+        if (!(neighbor in assignment)) {
+            if (!inferences[neighbor]) inferences[neighbor] = domains[neighbor].slice();
+
+            domains[neighbor] = domains[neighbor].filter(val => wordsMatch(variable, value, neighbor, val));
+            if (!domains[neighbor].length) {
+                return false;
+            }
+        }
+    }
+    return inferences;
+}
+
+function restoreDomains(inferences) {
+    if (!inferences) return;
+    for (const variable in inferences) {
+        domains[variable] = inferences[variable];
     }
 }
 
@@ -407,9 +449,8 @@ async function solveCrossword() {
 
 // Display the solution on the grid
 function displaySolution() {
-    for (const slot in solution) {
-        const word = solution[slot];
-        const positions = slots[slot in slots.across ? 'across' : 'down'][slot];
+    for (const [slot, word] of Object.entries(solution)) {
+        const positions = slots[slot];
 
         positions.forEach(([row, col], idx) => {
             const cell = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
@@ -423,17 +464,19 @@ function displaySolution() {
 
 // Display word list organized by slot number and direction
 function displayWordList() {
-    let acrossWords = [];
-    let downWords = [];
-
-    Object.keys(slots.across).sort((a, b) => a.localeCompare(b)).forEach(slot => {
-        acrossWords.push(`${slot}: ${solution[slot]}`);
-    });
-    Object.keys(slots.down).sort((a, b) => a.localeCompare(b)).forEach(slot => {
-        downWords.push(`${slot}: ${solution[slot]}`);
-    });
-
     const resultArea = document.getElementById("result");
+    const acrossWords = [];
+    const downWords = [];
+
+    for (const slot of Object.keys(slots)) {
+        const word = solution[slot];
+        if (slot.endsWith("ACROSS")) {
+            acrossWords.push(`${slot}: ${word}`);
+        } else if (slot.endsWith("DOWN")) {
+            downWords.push(`${slot}: ${word}`);
+        }
+    }
+
     resultArea.innerHTML = `<h3>Across:</h3><p>${acrossWords.join('<br>')}</p><h3>Down:</h3><p>${downWords.join('<br>')}</p>`;
 }
 
