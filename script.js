@@ -160,7 +160,7 @@ function findAcrossSlots(row) {
         if (grid[row][c] !== "#") {
             const { positions, hasNumber } = getConnectedCells(row, c, "across");
             if (positions.length > 1 && hasNumber) {
-                const startNumber = grid[row][positions[0][1]];
+                const startNumber = `A${grid[row][positions[0][1]]}`;  // Prefix with "A" for across
                 slots.across[startNumber] = positions;
                 console.log(`Across slot found: Start number ${startNumber} at row ${row} with positions`, positions);
             }
@@ -171,14 +171,13 @@ function findAcrossSlots(row) {
     }
 }
 
-// Helper to find down slots
 function findDownSlots(col) {
     let r = 0;
     while (r < grid.length) {
         if (grid[r][col] !== "#") {
             const { positions, hasNumber } = getConnectedCells(r, col, "down");
             if (positions.length > 1 && hasNumber) {
-                const startNumber = grid[positions[0][0]][col];
+                const startNumber = `D${grid[positions[0][0]][col]}`;  // Prefix with "D" for down
                 slots.down[startNumber] = positions;
                 console.log(`Down slot found: Start number ${startNumber} at column ${col} with positions`, positions);
             }
