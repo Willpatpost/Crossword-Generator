@@ -305,6 +305,27 @@ function selectUnassignedSlot(assignment) {
     return null;
 }
 
+function isConsistent(slot, word, assignment) {
+    const isAcross = slot in slots.across;
+    const positions = isAcross ? slots.across[slot] : slots.down[slot];
+
+    // Check that word fits in the slot
+    if (word.length !== positions.length) return false;
+
+    // Check each constraint where this slot intersects another slot
+    const slotConstraints = constraints[slot] || [];
+    for (const { slot: otherSlot, pos: [thisPos, otherPos] } of slotConstraints) {
+        const otherWord = assignment[otherSlot];
+
+        // If the other slot is assigned, check if the letters align
+        if (otherWord && word[thisPos] !== otherWord[otherPos]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 // Backtracking algorithm with constraint satisfaction
 function backtrackingSolve(assignment = {}) {
     console.log("Running backtrackingSolve with current assignment:", assignment);
