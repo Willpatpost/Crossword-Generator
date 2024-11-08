@@ -273,6 +273,19 @@ async function solveCrossword() {
     }, 10);
 }
 
+function getPossibleWords(slot) {
+    // Determine if the slot is across or down and get its length
+    const isAcross = slot in slots.across;
+    const positions = isAcross ? slots.across[slot] : slots.down[slot];
+    const length = positions.length;
+
+    // Retrieve words from the cache that match the required length
+    const possibleWords = wordLengthCache[length] || [];
+    console.log(`Possible words for slot ${slot} (length ${length}):`, possibleWords);
+
+    return possibleWords;
+}
+
 // Backtracking algorithm with constraint satisfaction
 function backtrackingSolve(assignment = {}) {
     console.log("Running backtrackingSolve with current assignment:", assignment);
