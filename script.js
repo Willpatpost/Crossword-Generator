@@ -11,11 +11,14 @@ let wordLengthCache = {};
 async function loadWords() {
     try {
         const response = await fetch('Data/Words.txt');
+        if (!response.ok) throw new Error("Could not load words file");
+        
         const text = await response.text();
         words = text.split('\n').map(word => word.trim().toUpperCase());
         cacheWordsByLength();
     } catch (error) {
         console.error("Error loading words:", error);
+        alert("Error loading words. Please check if Words.txt is available.");
     }
 }
 
@@ -24,9 +27,7 @@ function cacheWordsByLength() {
     wordLengthCache = {};
     for (const word of words) {
         const len = word.length;
-        if (!wordLengthCache[len]) {
-            wordLengthCache[len] = [];
-        }
+        if (!wordLengthCache[len]) wordLengthCache[len] = [];
         wordLengthCache[len].push(word);
     }
 }
@@ -36,13 +37,12 @@ function generateGrid() {
     const rows = parseInt(document.getElementById("rows").value);
     const cols = parseInt(document.getElementById("columns").value);
 
-    if (isNaN(rows) || isNaN(cols)) {
-        alert("Please enter valid numbers for rows and columns.");
+    if (isNaN(rows) || isNaN(cols) || rows <= 0 || cols <= 0) {
+        alert("Please enter valid positive numbers for rows and columns.");
         return;
     }
 
     grid = Array.from({ length: rows }, () => Array(cols).fill("#"));
-
     const gridContainer = document.getElementById("gridContainer");
     gridContainer.innerHTML = "";
 
@@ -71,6 +71,8 @@ function toggleCellOrAddNumber(cell) {
         if (!cell.classList.contains("black-cell") && !cell.textContent) {
             cell.textContent = currentNumber++;
             grid[row][col] = cell.textContent;
+        } else {
+            alert("Number can only be placed on empty white cells.");
         }
     } else {
         if (cell.classList.contains("black-cell")) {
@@ -101,12 +103,10 @@ function stopNumberEntryMode() {
 // Get the maximum number currently on the grid
 function getMaxNumberOnGrid() {
     let maxNumber = 0;
-    for (let row of grid) {
-        for (let cell of row) {
+    for (const row of grid) {
+        for (const cell of row) {
             const cellNumber = parseInt(cell);
-            if (!isNaN(cellNumber) && cellNumber > maxNumber) {
-                maxNumber = cellNumber;
-            }
+            if (!isNaN(cellNumber) && cellNumber > maxNumber) maxNumber = cellNumber;
         }
     }
     return maxNumber;
@@ -218,15 +218,18 @@ function generateConstraints() {
 // Solve the crossword puzzle using backtracking
 function solveCrossword() {
     generateSlots();
-
-    const result = backtrackingSolve();
-    if (result) {
-        displaySolution();
-        document.getElementById("result").textContent = "Crossword solved!";
-        displayWordList();
-    } else {
-        document.getElementById("result").textContent = "No possible solution.";
-    }
+    document.getElementById("result").textContent = "Solving...";
+    
+    setTimeout(() => {
+        const result = backtrackingSolve();
+        if (result) {
+            displaySolution();
+            document.getElementById("result").textContent = "Crossword solved!";
+            displayWordList();
+        } else {
+            document.getElementById("result").textContent = "No possible solution.";
+        }
+    }, 10);
 }
 
 // Backtracking algorithm with constraint satisfaction
