@@ -12,7 +12,6 @@
     </header>
 
     <main>
-        <!-- Grid Size Selection with streamlined layout -->
         <section id="settings" aria-label="Grid Size Settings">
             <h2>Select Grid Size</h2>
             <label for="rows">Rows:</label>
@@ -63,30 +62,27 @@
                 <option value="20">20</option>
             </select>
 
-            <button onclick="generateGrid()">Generate Grid</button>
+            <button id="generateGridButton">Generate Grid</button>
         </section>
 
-        <!-- Number Entry Controls -->
         <section id="number-entry-controls" aria-label="Number Entry Controls">
-            <button onclick="startNumberEntryMode()">Enter Number Mode</button>
-            <button onclick="stopNumberEntryMode()" id="stopNumberEntryButton" style="display: none;">Stop Entering Numbers</button>
+            <button id="startNumberEntryButton">Enter Number Mode</button>
+            <button id="stopNumberEntryButton" style="display: none;">Stop Entering Numbers</button>
         </section>
 
-        <!-- Crossword Grid Display Area -->
         <section id="crosswordGrid" aria-label="Crossword Grid Display">
             <h2>Crossword Grid</h2>
             <div id="gridContainer"></div>
         </section>
 
-        <!-- Solution Submission and Control Section -->
         <section id="controls" aria-label="Solution Controls">
-            <button onclick="solveCrossword()">Solve Crossword</button>
+            <button id="solveCrosswordButton">Solve Crossword</button>
+            <div id="loadingSpinner" class="spinner" style="display: none;"></div>
         </section>
 
-        <!-- Word List Display Area -->
         <section id="word-list" aria-label="Word List">
             <h3>Word List</h3>
-            <div id="result"></div> <!-- The word list will be dynamically inserted here -->
+            <div id="result" aria-live="polite"></div>
         </section>
     </main>
 
@@ -94,7 +90,6 @@
         <p>&copy; 2024 Crossword Generator</p>
     </footer>
 
-    <!-- JavaScript File -->
     <script src="script.js"></script>
 </body>
 </html>
