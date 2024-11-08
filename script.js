@@ -121,7 +121,22 @@ function getMaxNumberOnGrid() {
 // Find across and down slots with connected components
 function generateSlots() {
     slots = { across: {}, down: {} };
+    let hasWhiteCells = false;
 
+    for (let row of grid) {
+        for (let cell of row) {
+            if (cell === " ") hasWhiteCells = true;
+        }
+    }
+
+    console.log("Grid has white cells:", hasWhiteCells);
+
+    if (!hasWhiteCells) {
+        console.log("No white cells found; cannot generate slots.");
+        return;
+    }
+
+    // Continue with slot generation if white cells are present
     console.log("Generating across slots...");
     for (let r = 0; r < grid.length; r++) {
         findAcrossSlots(r);
@@ -233,6 +248,7 @@ function generateConstraints() {
 
 // Display loading spinner during crossword solving
 async function solveCrossword() {
+    console.log("Current grid state:", grid);
     console.log("Starting to solve crossword...");
     generateSlots(); // Ensure slots and constraints are generated before solving
     console.log("Generated slots:", slots);
