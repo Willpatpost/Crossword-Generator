@@ -215,13 +215,21 @@ function generateConstraints() {
     }
 }
 
-// Solve the crossword puzzle using backtracking
-function solveCrossword() {
-    generateSlots();
+// Event listeners for buttons
+document.getElementById("generateGridButton").addEventListener("click", generateGrid);
+document.getElementById("startNumberEntryButton").addEventListener("click", startNumberEntryMode);
+document.getElementById("stopNumberEntryButton").addEventListener("click", stopNumberEntryMode);
+document.getElementById("solveCrosswordButton").addEventListener("click", solveCrossword);
+
+// Display loading spinner during crossword solving
+async function solveCrossword() {
+    document.getElementById("loadingSpinner").style.display = "block";
     document.getElementById("result").textContent = "Solving...";
-    
+
     setTimeout(() => {
         const result = backtrackingSolve();
+        document.getElementById("loadingSpinner").style.display = "none";
+        
         if (result) {
             displaySolution();
             document.getElementById("result").textContent = "Crossword solved!";
