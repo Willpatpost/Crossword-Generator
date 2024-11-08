@@ -79,6 +79,7 @@ function toggleCellOrAddNumber(cell) {
         if (!cell.classList.contains("black-cell") && !cell.textContent) {
             cell.textContent = currentNumber++;
             grid[row][col] = cell.textContent;
+            cell.classList.add("numbered-cell");
         } else {
             alert("Number can only be placed on empty white cells.");
         }
@@ -143,80 +144,66 @@ function generateSlots() {
 
     const rows = grid.length;
     const cols = grid[0].length;
-    let slotId = 1;
 
-    // Identify cells with pre-filled letters
+    // Identify cells with pre-filled letters or numbers
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             const cell = grid[r][c];
             if (/^[A-Z]$/.test(cell)) {
                 cellContents[`${r},${c}`] = cell;
             } else if (cell !== "#" && cell.trim() !== "") {
+                // Cells with numbers
                 cellContents[`${r},${c}`] = null;
             }
         }
     }
 
-    // Generate across slots
+    // Generate slots only for numbered cells
     for (let r = 0; r < rows; r++) {
-        let c = 0;
-        while (c < cols) {
+        for (let c = 0; c < cols; c++) {
             const cell = grid[r][c];
-            if (cell !== "#") {
-                if (c === 0 || grid[r][c - 1] === "#") {
-                    let slotLength = 0;
-                    let positions = [];
-                    let slotNumber = /^[0-9]+$/.test(cell) ? cell : null;
-                    let startC = c;
-                    while (c < cols && grid[r][c] !== "#") {
-                        positions.push([r, c]);
-                        slotLength++;
-                        c++;
-                    }
-                    if (slotLength >= 2) {
-                        const slotName = slotNumber ? `${slotNumber}ACROSS` : `S${slotId++}ACROSS`;
-                        slots[slotName] = positions;
-                    }
-                } else {
-                    c++;
-                }
-            } else {
-                c++;
-            }
-        }
-    }
 
-    // Generate down slots
-    for (let c = 0; c < cols; c++) {
-        let r = 0;
-        while (r < rows) {
-            const cell = grid[r][c];
-            if (cell !== "#") {
-                if (r === 0 || grid[r - 1][c] === "#") {
-                    let slotLength = 0;
-                    let positions = [];
-                    let slotNumber = /^[0-9]+$/.test(cell) ? cell : null;
-                    let startR = r;
-                    while (r < rows && grid[r][c] !== "#") {
-                        positions.push([r, c]);
-                        slotLength++;
-                        r++;
-                    }
-                    if (slotLength >= 2) {
-                        const slotName = slotNumber ? `${slotNumber}DOWN` : `S${slotId++}DOWN`;
+            if (/^\d+$/.test(cell)) {
+                // Check for across slot
+                if (c === 0 || grid[r][c - 1] === "#") {
+                    const positions = getSlotPositions(r, c, "across");
+                    if (positions.length >= 2) {
+                        const slotName = `${cell}ACROSS`;
                         slots[slotName] = positions;
                     }
-                } else {
-                    r++;
                 }
-            } else {
-                r++;
+                // Check for down slot
+                if (r === 0 || grid[r - 1][c] === "#") {
+                    const positions = getSlotPositions(r, c, "down");
+                    if (positions.length >= 2) {
+                        const slotName = `${cell}DOWN`;
+                        slots[slotName] = positions;
+                    }
+                }
             }
         }
     }
 
     generateConstraints();
     setupDomains();
+}
+
+// Helper function to get slot positions in a direction
+function getSlotPositions(r, c, direction) {
+    const positions = [];
+    const rows = grid.length;
+    const cols = grid[0].length;
+
+    while (r < rows && c < cols && grid[r][c] !== "#") {
+        positions.push([r, c]);
+        if (direction === "across") {
+            c++;
+        } else {
+            r++;
+        }
+    }
+
+    return positions;
 }
 
 // Generate constraints based on slot intersections
@@ -433,6 +420,10 @@ function restoreDomains(inferences) {
 // Solve the crossword
 async function solveCrossword() {
     generateSlots();
+    if (Object.keys(slots).length === 0) {
+        alert("No numbered slots found to solve.");
+        return;
+    }
     if (ac3()) {
         const result = backtrackingSolve();
         if (result) {
