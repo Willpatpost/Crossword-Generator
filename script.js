@@ -286,6 +286,25 @@ function getPossibleWords(slot) {
     return possibleWords;
 }
 
+function selectUnassignedSlot(assignment) {
+    // Look for the first unassigned across slot
+    for (const slot in slots.across) {
+        if (!(slot in assignment)) {
+            return slot;
+        }
+    }
+    
+    // If no across slots are available, look for unassigned down slots
+    for (const slot in slots.down) {
+        if (!(slot in assignment)) {
+            return slot;
+        }
+    }
+    
+    // If no unassigned slots are found, return null
+    return null;
+}
+
 // Backtracking algorithm with constraint satisfaction
 function backtrackingSolve(assignment = {}) {
     console.log("Running backtrackingSolve with current assignment:", assignment);
