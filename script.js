@@ -9,14 +9,20 @@ let currentNumber = 1;
 let wordLengthCache = {};
 let domains = {};
 let cellContents = {};
-const DEBUG = true; // Global toggle for debugging logs
-const DEBUG_DOMAIN = true; // Toggle for domain-related logs
-const DEBUG_BACKTRACK = true; // Toggle for backtracking logs
-const DEBUG_CONSTRAINTS = true; // Toggle for constraint setup logs
 
-// Helper function for logging
+// Example: Disable specific flags temporarily
+const DEBUG = true; // Global toggle for essential debugging logs
+const DEBUG_DOMAIN = false; // Temporarily disable domain-related logs
+const DEBUG_BACKTRACK = true; // Focus on backtracking logs
+const DEBUG_CONSTRAINTS = false; // Disable constraints logs for now
+// Adjusted debugLog function for more selective logging
 function debugLog(message, flag = DEBUG, ...optionalParams) {
-    if (flag) console.log(message, ...optionalParams);
+    if (flag) {
+        // Only log messages with specific keywords for critical debugging
+        if (message.includes("Domain wiped out") || message.includes("No possible solution")) {
+            console.log(message, ...optionalParams);
+        }
+    }
 }
 
 // Event listeners for buttons
