@@ -1,5 +1,6 @@
 // script.js
 
+// Global variables
 let grid = [];
 let words = [];
 let slots = {};
@@ -10,6 +11,12 @@ let currentNumber = 1;
 let wordLengthCache = {};
 let domains = {};
 let cellContents = {};
+const DEBUG = false; // Toggle debug messages
+
+// Helper function for logging
+function debugLog(message, ...optionalParams) {
+    if (DEBUG) console.log(message, ...optionalParams);
+}
 
 // Event listeners for buttons
 document.getElementById("generateGridButton").addEventListener("click", generateGrid);
@@ -25,11 +32,16 @@ async function loadWords() {
 
         const text = await response.text();
         words = text.split('\n').map(word => word.trim().toUpperCase());
+        
+        if (!words.every(word => /^[A-Z]+$/.test(word))) {
+            throw new Error("File contains invalid words. Ensure all entries are alphabetic.");
+        }
+        
         cacheWordsByLength();
-        console.log("Words loaded:", words.length);
+        debugLog("Words loaded:", words.length);
     } catch (error) {
         console.error("Error loading words:", error);
-        alert("Error loading words. Please check if Words.txt is available.");
+        alert("Error loading words. Please check if Words.txt is available and correctly formatted.");
     }
 }
 
@@ -41,7 +53,7 @@ function cacheWordsByLength() {
         if (!wordLengthCache[len]) wordLengthCache[len] = [];
         wordLengthCache[len].push(word);
     }
-    console.log("Word length cache created.");
+    debugLog("Word length cache created.");
 }
 
 // Initialize the grid with black cells
@@ -73,7 +85,7 @@ function generateGrid() {
         gridContainer.appendChild(rowDiv);
     }
 
-    console.log("Grid generated with rows:", rows, "columns:", cols);
+    debugLog("Grid generated with rows:", rows, "columns:", cols);
 }
 
 // Toggle cell between black and white, add numbers, or pre-filled letters
@@ -94,7 +106,6 @@ function toggleCellOrAddNumber(cell) {
         cell.textContent = "";
         grid[row][col] = " ";
     } else if (cell.classList.contains("white-cell")) {
-        // Toggle between white cell and pre-filled letter mode
         let letter = prompt("Enter a letter (or leave blank to toggle back to black):");
         if (letter) {
             letter = letter.toUpperCase();
@@ -123,14 +134,14 @@ function startNumberEntryMode() {
     currentNumber = getMaxNumberOnGrid() + 1;
     isNumberEntryMode = true;
     document.getElementById("stopNumberEntryButton").style.display = "inline";
-    console.log("Number entry mode started. Current number:", currentNumber);
+    debugLog("Number entry mode started. Current number:", currentNumber);
 }
 
 // Stop number-entry mode
 function stopNumberEntryMode() {
     isNumberEntryMode = false;
     document.getElementById("stopNumberEntryButton").style.display = "none";
-    console.log("Number entry mode stopped.");
+    debugLog("Number entry mode stopped.");
 }
 
 // Get the maximum number currently on the grid
@@ -154,26 +165,21 @@ function generateSlots() {
     const rows = grid.length;
     const cols = grid[0].length;
 
-    // Identify cells with pre-filled letters or numbers
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             const cell = grid[r][c];
             if (/^[A-Z]$/.test(cell)) {
                 cellContents[`${r},${c}`] = cell;
             } else if (cell !== "#" && cell.trim() !== "") {
-                // Cells with numbers
                 cellContents[`${r},${c}`] = null;
             }
         }
     }
 
-    // Generate slots only for numbered cells
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             const cell = grid[r][c];
-
             if (/^\d+$/.test(cell)) {
-                // Check for across slot
                 if (c === 0 || grid[r][c - 1] === "#") {
                     const positions = getSlotPositions(r, c, "across");
                     if (positions.length >= 2) {
@@ -181,7 +187,6 @@ function generateSlots() {
                         slots[slotName] = positions;
                     }
                 }
-                // Check for down slot
                 if (r === 0 || grid[r - 1][c] === "#") {
                     const positions = getSlotPositions(r, c, "down");
                     if (positions.length >= 2) {
@@ -193,7 +198,7 @@ function generateSlots() {
         }
     }
 
-    console.log("Generated Slots:", slots);
+    debugLog("Generated Slots:", slots);
 
     generateConstraints();
     setupDomains();
@@ -250,7 +255,7 @@ function generateConstraints() {
         }
     }
 
-    console.log("Generated Constraints:", constraints);
+    debugLog("Generated Constraints:", constraints);
 }
 
 // Set up domains for each slot, considering pre-filled letters
@@ -276,11 +281,11 @@ function setupDomains() {
         }
     }
 
-    console.log("Domains after setup:", domains);
+    debugLog("Domains after setup:", domains);
 }
 
 // AC-3 Algorithm
-function ac3() {
+async function ac3() {
     const queue = [];
     for (const [var1, neighbors] of Object.entries(constraints)) {
         for (const var2 of Object.keys(neighbors)) {
@@ -288,12 +293,12 @@ function ac3() {
         }
     }
 
-    console.log("Initial AC-3 queue:", queue);
+    debugLog("Initial AC-3 queue:", queue);
 
     while (queue.length) {
         const [var1, var2] = queue.shift();
         if (revise(var1, var2)) {
-            console.log(`Revised ${var1}, new domain:`, domains[var1]);
+            debugLog(`Revised ${var1}, new domain:`, domains[var1]);
             if (!domains[var1].length) {
                 console.error(`Domain wiped out for ${var1} during AC-3.`);
                 return false;
@@ -302,6 +307,7 @@ function ac3() {
                 if (neighbor !== var2) queue.push([neighbor, var1]);
             }
         }
+        await new Promise(resolve => setTimeout(resolve, 0)); // Yield control to the browser
     }
     return true;
 }
@@ -343,15 +349,15 @@ function revise(var1, var2) {
 function backtrackingSolve(assignment = {}) {
     if (Object.keys(assignment).length === Object.keys(domains).length) {
         solution = assignment;
-        console.log("Solution found:", solution);
+        debugLog("Solution found:", solution);
         return true;
     }
 
     const varToAssign = selectUnassignedVariable(assignment);
-    console.log("Selecting variable to assign:", varToAssign);
+    debugLog("Selecting variable to assign:", varToAssign);
 
     for (const value of orderDomainValues(varToAssign, assignment)) {
-        console.log(`Trying ${value} for ${varToAssign}`);
+        debugLog(`Trying ${value} for ${varToAssign}`);
         if (isConsistent(varToAssign, value, assignment)) {
             assignment[varToAssign] = value;
             const inferences = forwardCheck(varToAssign, value, assignment);
@@ -432,7 +438,7 @@ function forwardCheck(variable, value, assignment) {
 
             domains[neighbor] = domains[neighbor].filter(val => wordsMatch(variable, value, neighbor, val));
             if (!domains[neighbor].length) {
-                console.warn(`Domain wiped out for ${neighbor} during forward checking.`);
+                debugLog(`Domain wiped out for ${neighbor} during forward checking.`);
                 return false;
             }
         }
@@ -449,19 +455,22 @@ function restoreDomains(inferences) {
 
 // Solve the crossword
 async function solveCrossword() {
+    document.getElementById("result").textContent = "Setting up constraints...";
     generateSlots();
+
     if (Object.keys(slots).length === 0) {
         alert("No numbered slots found to solve.");
         return;
     }
 
-    // Allow UI to update before starting the solver
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise(resolve => setTimeout(resolve, 10)); // Allow UI update
 
-    console.log("Starting AC-3 algorithm...");
-    if (ac3()) {
-        console.log("AC-3 algorithm completed successfully.");
-        console.log("Starting backtracking search...");
+    debugLog("Starting AC-3 algorithm...");
+    document.getElementById("result").textContent = "Running AC-3 algorithm...";
+
+    if (await ac3()) {
+        debugLog("AC-3 algorithm completed successfully.");
+        document.getElementById("result").textContent = "Starting backtracking search...";
         const result = backtrackingSolve();
         if (result) {
             displaySolution();
@@ -488,7 +497,7 @@ function displaySolution() {
             }
         });
     }
-    console.log("Solution displayed on the grid.");
+    debugLog("Solution displayed on the grid.");
 }
 
 // Display word list organized by slot number and direction
