@@ -1,3 +1,5 @@
+// script.js
+
 let grid = [];
 let words = [];
 let slots = {};
@@ -24,6 +26,7 @@ async function loadWords() {
         const text = await response.text();
         words = text.split('\n').map(word => word.trim().toUpperCase());
         cacheWordsByLength();
+        console.log("Words loaded:", words.length);
     } catch (error) {
         console.error("Error loading words:", error);
         alert("Error loading words. Please check if Words.txt is available.");
@@ -38,6 +41,7 @@ function cacheWordsByLength() {
         if (!wordLengthCache[len]) wordLengthCache[len] = [];
         wordLengthCache[len].push(word);
     }
+    console.log("Word length cache created.");
 }
 
 // Initialize the grid with black cells
@@ -68,6 +72,8 @@ function generateGrid() {
         }
         gridContainer.appendChild(rowDiv);
     }
+
+    console.log("Grid generated with rows:", rows, "columns:", cols);
 }
 
 // Toggle cell between black and white, add numbers, or pre-filled letters
@@ -89,8 +95,9 @@ function toggleCellOrAddNumber(cell) {
         grid[row][col] = " ";
     } else if (cell.classList.contains("white-cell")) {
         // Toggle between white cell and pre-filled letter mode
-        let letter = prompt("Enter a letter (or leave blank to toggle back to black):").toUpperCase();
+        let letter = prompt("Enter a letter (or leave blank to toggle back to black):");
         if (letter) {
+            letter = letter.toUpperCase();
             if (/^[A-Z]$/.test(letter)) {
                 cell.textContent = letter;
                 cell.classList.add("prefilled-cell");
@@ -116,12 +123,14 @@ function startNumberEntryMode() {
     currentNumber = getMaxNumberOnGrid() + 1;
     isNumberEntryMode = true;
     document.getElementById("stopNumberEntryButton").style.display = "inline";
+    console.log("Number entry mode started. Current number:", currentNumber);
 }
 
 // Stop number-entry mode
 function stopNumberEntryMode() {
     isNumberEntryMode = false;
     document.getElementById("stopNumberEntryButton").style.display = "none";
+    console.log("Number entry mode stopped.");
 }
 
 // Get the maximum number currently on the grid
@@ -184,6 +193,8 @@ function generateSlots() {
         }
     }
 
+    console.log("Generated Slots:", slots);
+
     generateConstraints();
     setupDomains();
 }
@@ -238,6 +249,8 @@ function generateConstraints() {
             }
         }
     }
+
+    console.log("Generated Constraints:", constraints);
 }
 
 // Set up domains for each slot, considering pre-filled letters
@@ -257,7 +270,13 @@ function setupDomains() {
         domains[slot] = possibleWords.filter(word => {
             return Object.entries(preFilled).every(([idx, letter]) => word[idx] === letter);
         });
+
+        if (domains[slot].length === 0) {
+            console.warn(`Domain for slot ${slot} is empty after setup.`);
+        }
     }
+
+    console.log("Domains after setup:", domains);
 }
 
 // AC-3 Algorithm
@@ -269,10 +288,16 @@ function ac3() {
         }
     }
 
+    console.log("Initial AC-3 queue:", queue);
+
     while (queue.length) {
         const [var1, var2] = queue.shift();
         if (revise(var1, var2)) {
-            if (!domains[var1].length) return false;
+            console.log(`Revised ${var1}, new domain:`, domains[var1]);
+            if (!domains[var1].length) {
+                console.error(`Domain wiped out for ${var1} during AC-3.`);
+                return false;
+            }
             for (const neighbor of Object.keys(constraints[var1])) {
                 if (neighbor !== var2) queue.push([neighbor, var1]);
             }
@@ -318,11 +343,15 @@ function revise(var1, var2) {
 function backtrackingSolve(assignment = {}) {
     if (Object.keys(assignment).length === Object.keys(domains).length) {
         solution = assignment;
+        console.log("Solution found:", solution);
         return true;
     }
 
     const varToAssign = selectUnassignedVariable(assignment);
+    console.log("Selecting variable to assign:", varToAssign);
+
     for (const value of orderDomainValues(varToAssign, assignment)) {
+        console.log(`Trying ${value} for ${varToAssign}`);
         if (isConsistent(varToAssign, value, assignment)) {
             assignment[varToAssign] = value;
             const inferences = forwardCheck(varToAssign, value, assignment);
@@ -403,6 +432,7 @@ function forwardCheck(variable, value, assignment) {
 
             domains[neighbor] = domains[neighbor].filter(val => wordsMatch(variable, value, neighbor, val));
             if (!domains[neighbor].length) {
+                console.warn(`Domain wiped out for ${neighbor} during forward checking.`);
                 return false;
             }
         }
@@ -424,7 +454,14 @@ async function solveCrossword() {
         alert("No numbered slots found to solve.");
         return;
     }
+
+    // Allow UI to update before starting the solver
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    console.log("Starting AC-3 algorithm...");
     if (ac3()) {
+        console.log("AC-3 algorithm completed successfully.");
+        console.log("Starting backtracking search...");
         const result = backtrackingSolve();
         if (result) {
             displaySolution();
@@ -451,6 +488,7 @@ function displaySolution() {
             }
         });
     }
+    console.log("Solution displayed on the grid.");
 }
 
 // Display word list organized by slot number and direction
