@@ -1,62 +1,226 @@
-// Generate constraints based on slot intersections
-function generateConstraints() {
-    constraints = {};
-    let positionMap = {};
+// Global variables and debugging flags
+let grid = [];
+let words = [];
+let slots = {};
+let constraints = {};
+let solution = {};
+let isNumberEntryMode = false;
+let currentNumber = 1;
+let wordLengthCache = {};
+let domains = {};
+let cellContents = {};
+const DEBUG = true; // Global toggle for debugging logs
+const DEBUG_DOMAIN = true; // Toggle for domain-related logs
+const DEBUG_BACKTRACK = true; // Toggle for backtracking logs
+const DEBUG_CONSTRAINTS = true; // Toggle for constraint setup logs
 
-    for (const [slot, positions] of Object.entries(slots)) {
-        positions.forEach((pos, idx) => {
-            const key = `${pos[0]},${pos[1]}`;
-            if (!positionMap[key]) positionMap[key] = [];
-            positionMap[key].push({ slot, idx });
-        });
+// Helper function for logging
+function debugLog(message, flag = DEBUG, ...optionalParams) {
+    if (flag) console.log(message, ...optionalParams);
+}
+
+// Event listeners for buttons
+document.getElementById("generateGridButton").addEventListener("click", generateGrid);
+document.getElementById("startNumberEntryButton").addEventListener("click", startNumberEntryMode);
+document.getElementById("stopNumberEntryButton").addEventListener("click", stopNumberEntryMode);
+document.getElementById("solveCrosswordButton").addEventListener("click", solveCrossword);
+
+// Load words from an external file and cache by word length
+async function loadWords() {
+    try {
+        const response = await fetch('Data/Words.txt');
+        if (!response.ok) throw new Error("Could not load words file");
+
+        const text = await response.text();
+        words = text.split('\n').map(word => word.trim().toUpperCase());
+        
+        if (!words.every(word => /^[A-Z]+$/.test(word))) {
+            throw new Error("File contains invalid words. Ensure all entries are alphabetic.");
+        }
+        
+        cacheWordsByLength();
+        debugLog("Words loaded:", DEBUG, words.length);
+    } catch (error) {
+        console.error("Error loading words:", error);
+        alert("Error loading words. Please check if Words.txt is available and correctly formatted.");
+    }
+}
+
+// Cache words by length to optimize domain setup
+function cacheWordsByLength() {
+    wordLengthCache = {};
+    for (const word of words) {
+        const len = word.length;
+        if (!wordLengthCache[len]) wordLengthCache[len] = [];
+        wordLengthCache[len].push(word);
+    }
+    debugLog("Word length cache created.", DEBUG);
+}
+
+// Initialize the grid with black cells
+function generateGrid() {
+    const rows = parseInt(document.getElementById("rows").value);
+    const cols = parseInt(document.getElementById("columns").value);
+
+    if (isNaN(rows) || isNaN(cols) || rows <= 0 || cols <= 0) {
+        alert("Please enter valid positive numbers for rows and columns.");
+        return;
     }
 
-    for (const overlaps of Object.values(positionMap)) {
-        if (overlaps.length > 1) {
-            for (let i = 0; i < overlaps.length; i++) {
-                for (let j = i + 1; j < overlaps.length; j++) {
-                    const { slot: slot1, idx: idx1 } = overlaps[i];
-                    const { slot: slot2, idx: idx2 } = overlaps[j];
+    grid = Array.from({ length: rows }, () => Array(cols).fill("#"));
+    const gridContainer = document.getElementById("gridContainer");
+    gridContainer.innerHTML = "";
 
-                    if (!constraints[slot1]) constraints[slot1] = {};
-                    if (!constraints[slot2]) constraints[slot2] = {};
+    for (let r = 0; r < rows; r++) {
+        const rowDiv = document.createElement("div");
+        rowDiv.classList.add("grid-row");
 
-                    if (!constraints[slot1][slot2]) constraints[slot1][slot2] = [];
-                    if (!constraints[slot2][slot1]) constraints[slot2][slot1] = [];
+        for (let c = 0; c < cols; c++) {
+            const cellDiv = document.createElement("div");
+            cellDiv.classList.add("grid-cell", "black-cell");
+            cellDiv.dataset.row = r;
+            cellDiv.dataset.col = c;
+            cellDiv.addEventListener("click", () => toggleCellOrAddNumber(cellDiv));
+            rowDiv.appendChild(cellDiv);
+        }
+        gridContainer.appendChild(rowDiv);
+    }
 
-                    constraints[slot1][slot2].push([idx1, idx2]);
-                    constraints[slot2][slot1].push([idx2, idx1]);
+    debugLog("Grid generated with rows:", DEBUG, rows, "columns:", cols);
+}
+
+// Toggle cell between black and white, add numbers, or pre-filled letters
+function toggleCellOrAddNumber(cell) {
+    const row = parseInt(cell.dataset.row);
+    const col = parseInt(cell.dataset.col);
+
+    if (isNumberEntryMode) {
+        if (!cell.classList.contains("black-cell") && !cell.textContent) {
+            cell.textContent = currentNumber++;
+            grid[row][col] = cell.textContent;
+            cell.classList.add("numbered-cell");
+        } else {
+            alert("Number can only be placed on empty white cells.");
+        }
+    } else if (cell.classList.contains("black-cell")) {
+        cell.classList.replace("black-cell", "white-cell");
+        cell.textContent = "";
+        grid[row][col] = " ";
+    } else if (cell.classList.contains("white-cell")) {
+        let letter = prompt("Enter a letter (or leave blank to toggle back to black):");
+        if (letter) {
+            letter = letter.toUpperCase();
+            if (/^[A-Z]$/.test(letter)) {
+                cell.textContent = letter;
+                cell.classList.add("prefilled-cell");
+                grid[row][col] = letter;
+            } else {
+                alert("Please enter a single letter A-Z.");
+            }
+        } else {
+            cell.classList.replace("white-cell", "black-cell");
+            cell.textContent = "";
+            grid[row][col] = "#";
+        }
+    } else if (cell.classList.contains("prefilled-cell")) {
+        cell.classList.remove("prefilled-cell");
+        cell.classList.add("white-cell");
+        cell.textContent = "";
+        grid[row][col] = " ";
+    }
+}
+
+// Start number-entry mode
+function startNumberEntryMode() {
+    currentNumber = getMaxNumberOnGrid() + 1;
+    isNumberEntryMode = true;
+    document.getElementById("stopNumberEntryButton").style.display = "inline";
+    debugLog("Number entry mode started. Current number:", currentNumber);
+}
+
+// Stop number-entry mode
+function stopNumberEntryMode() {
+    isNumberEntryMode = false;
+    document.getElementById("stopNumberEntryButton").style.display = "none";
+    debugLog("Number entry mode stopped.");
+}
+
+// Get the maximum number currently on the grid
+function getMaxNumberOnGrid() {
+    let maxNumber = 0;
+    for (const row of grid) {
+        for (const cell of row) {
+            const cellNumber = parseInt(cell);
+            if (!isNaN(cellNumber) && cellNumber > maxNumber) maxNumber = cellNumber;
+        }
+    }
+    return maxNumber;
+}
+
+// Generate slots and handle pre-filled letters
+function generateSlots() {
+    slots = {};
+    domains = {};
+    cellContents = {};
+
+    const rows = grid.length;
+    const cols = grid[0].length;
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const cell = grid[r][c];
+            if (/^[A-Z]$/.test(cell)) {
+                cellContents[`${r},${c}`] = cell;
+            } else if (cell !== "#" && cell.trim() !== "") {
+                cellContents[`${r},${c}`] = null;
+            }
+        }
+    }
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const cell = grid[r][c];
+            if (/^\d+$/.test(cell)) {
+                if (c === 0 || grid[r][c - 1] === "#") {
+                    const positions = getSlotPositions(r, c, "across");
+                    if (positions.length >= 2) {
+                        const slotName = `${cell}ACROSS`;
+                        slots[slotName] = positions;
+                    }
+                }
+                if (r === 0 || grid[r - 1][c] === "#") {
+                    const positions = getSlotPositions(r, c, "down");
+                    if (positions.length >= 2) {
+                        const slotName = `${cell}DOWN`;
+                        slots[slotName] = positions;
+                    }
                 }
             }
         }
     }
 
-    debugLog("Generated Constraints:", DEBUG_CONSTRAINTS, constraints);
+    debugLog("Generated Slots:", DEBUG_CONSTRAINTS, slots);
+
+    generateConstraints();
+    setupDomains();
 }
 
-// Set up domains for each slot, considering pre-filled letters
-function setupDomains() {
-    domains = {};
-    for (const [slot, positions] of Object.entries(slots)) {
-        const length = positions.length;
-        const preFilled = {};
-        positions.forEach(([r, c], idx) => {
-            const key = `${r},${c}`;
-            if (cellContents[key]) {
-                preFilled[idx] = cellContents[key];
-            }
-        });
+// Helper function to get slot positions in a direction
+function getSlotPositions(r, c, direction) {
+    const positions = [];
+    const rows = grid.length;
+    const cols = grid[0].length;
 
-        const possibleWords = wordLengthCache[length] ? wordLengthCache[length] : [];
-        domains[slot] = possibleWords.filter(word => {
-            return Object.entries(preFilled).every(([idx, letter]) => word[idx] === letter);
-        });
-
-        if (domains[slot].length === 0) {
-            console.warn(`Domain for slot ${slot} is empty after setup.`);
+    while (r < rows && c < cols && grid[r][c] !== "#") {
+        positions.push([r, c]);
+        if (direction === "across") {
+            c++;
+        } else {
+            r++;
         }
-        debugLog(`Domain for slot ${slot}:`, DEBUG_DOMAIN, domains[slot]);
     }
+
+    return positions;
 }
 
 // Generate constraints based on slot intersections
