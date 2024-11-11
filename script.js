@@ -16,8 +16,8 @@ const RANDOM_SEED = 123;
 let seed = RANDOM_SEED;
 
 function seededRandom() {
-    let x = Math.sin(seed++) * 10000;
-    return x - Math.floor(x);
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
 }
 
 function shuffleWithSeed(array) {
@@ -87,9 +87,8 @@ function generateGrid() {
     }
 
     grid = Array.from({ length: rows }, () => Array(cols).fill("#"));
-    const gridContainer = document.getElementById("gridContainer");
-    gridContainer.innerHTML = "";
 
+    const fragment = document.createDocumentFragment();
     for (let r = 0; r < rows; r++) {
         const rowDiv = document.createElement("div");
         rowDiv.classList.add("grid-row");
@@ -102,9 +101,12 @@ function generateGrid() {
             cellDiv.addEventListener("click", () => toggleCellOrAddNumber(cellDiv));
             rowDiv.appendChild(cellDiv);
         }
-        gridContainer.appendChild(rowDiv);
+        fragment.appendChild(rowDiv);
     }
 
+    const gridContainer = document.getElementById("gridContainer");
+    gridContainer.innerHTML = ""; // Clear previous content
+    gridContainer.appendChild(fragment);
     debugLog("Grid generated with rows:", rows, "columns:", cols);
 }
 
@@ -165,7 +167,10 @@ function stopNumberEntryMode() {
 }
 
 // Get the maximum number currently on the grid
+let maxNumberCache = null;
 function getMaxNumberOnGrid() {
+    if (maxNumberCache !== null) return maxNumberCache;
+
     let maxNumber = 0;
     for (const row of grid) {
         for (const cell of row) {
@@ -173,6 +178,7 @@ function getMaxNumberOnGrid() {
             if (!isNaN(cellNumber) && cellNumber > maxNumber) maxNumber = cellNumber;
         }
     }
+    maxNumberCache = maxNumber;
     return maxNumber;
 }
 
@@ -244,32 +250,32 @@ function getSlotPositions(r, c, direction) {
 
 // Generate constraints based on slot intersections
 function generateConstraints() {
-    constraints = {};
-    let positionMap = {};
+    constraints = new Map();
+    const positionMap = new Map();
 
     for (const [slot, positions] of Object.entries(slots)) {
         positions.forEach((pos, idx) => {
             const key = `${pos[0]},${pos[1]}`;
-            if (!positionMap[key]) positionMap[key] = [];
-            positionMap[key].push({ slot, idx });
+            if (!positionMap.has(key)) positionMap.set(key, []);
+            positionMap.get(key).push({ slot, idx });
         });
     }
 
-    for (const overlaps of Object.values(positionMap)) {
+    for (const overlaps of positionMap.values()) {
         if (overlaps.length > 1) {
             for (let i = 0; i < overlaps.length; i++) {
                 for (let j = i + 1; j < overlaps.length; j++) {
                     const { slot: slot1, idx: idx1 } = overlaps[i];
                     const { slot: slot2, idx: idx2 } = overlaps[j];
 
-                    if (!constraints[slot1]) constraints[slot1] = {};
-                    if (!constraints[slot2]) constraints[slot2] = {};
+                    if (!constraints.has(slot1)) constraints.set(slot1, new Map());
+                    if (!constraints.has(slot2)) constraints.set(slot2, new Map());
 
-                    if (!constraints[slot1][slot2]) constraints[slot1][slot2] = [];
-                    if (!constraints[slot2][slot1]) constraints[slot2][slot1] = [];
+                    if (!constraints.get(slot1).has(slot2)) constraints.get(slot1).set(slot2, []);
+                    if (!constraints.get(slot2).has(slot1)) constraints.get(slot2).set(slot1, []);
 
-                    constraints[slot1][slot2].push([idx1, idx2]);
-                    constraints[slot2][slot1].push([idx2, idx1]);
+                    constraints.get(slot1).get(slot2).push([idx1, idx2]);
+                    constraints.get(slot2).get(slot1).push([idx2, idx1]);
                 }
             }
         }
@@ -280,16 +286,16 @@ function generateConstraints() {
 
 // Set up domains for each slot using regex for faster filtering
 function setupDomains() {
-    domains = {};
+    domains = new Map();
     for (const [slot, positions] of Object.entries(slots)) {
         const length = positions.length;
         let regexPattern = positions.map(([r, c]) => cellContents[`${r},${c}`] || '.').join('');
         const regex = new RegExp(`^${regexPattern}$`);
         
         const possibleWords = wordLengthCache[length] ? wordLengthCache[length] : [];
-        domains[slot] = possibleWords.filter(word => regex.test(word));
+        domains.set(slot, possibleWords.filter(word => regex.test(word)));
         
-        if (domains[slot].length === 0) {
+        if (domains.get(slot).length === 0) {
             console.warn(`Domain for slot ${slot} is empty after setup.`);
         }
     }
@@ -300,8 +306,8 @@ function setupDomains() {
 // AC-3 Algorithm with asynchronicity for better UI responsiveness
 async function ac3() {
     const queue = [];
-    for (const [var1, neighbors] of Object.entries(constraints)) {
-        for (const var2 of Object.keys(neighbors)) {
+    for (const [var1, neighbors] of constraints) {
+        for (const var2 of neighbors.keys()) {
             queue.push([var1, var2]);
         }
     }
@@ -311,12 +317,12 @@ async function ac3() {
     while (queue.length) {
         const [var1, var2] = queue.shift();
         if (revise(var1, var2)) {
-            debugLog(`Revised ${var1}, new domain:`, domains[var1]);
-            if (!domains[var1].length) {
+            debugLog(`Revised ${var1}, new domain:`, domains.get(var1));
+            if (!domains.get(var1).length) {
                 console.error(`Domain wiped out for ${var1} during AC-3.`);
                 return false;
             }
-            for (const neighbor of Object.keys(constraints[var1])) {
+            for (const neighbor of constraints.get(var1).keys()) {
                 if (neighbor !== var2) queue.push([neighbor, var1]);
             }
         }
