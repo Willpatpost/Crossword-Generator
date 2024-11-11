@@ -304,11 +304,11 @@
             const length = positions.length;
             let regexPattern = positions.map(([r, c]) => {
                 const content = cellContents.get(`${r},${c}`);
-                return content !== null && content !== undefined ? content : '.';
+                return content ? content : '.';
             }).join('');
             const regex = new RegExp(`^${regexPattern}$`);
 
-            const possibleWords = wordLengthCache.get(length) ? wordLengthCache.get(length) : [];
+            const possibleWords = wordLengthCache.get(length) || [];
             const filteredWords = possibleWords.filter(word => regex.test(word));
 
             if (filteredWords.length === 0) {
@@ -319,6 +319,20 @@
         }
 
         debugLog("Domains after setup:", domains);
+    }
+
+    // Function to check if a word matches the pre-filled letters in a slot
+    function wordMatchesPreFilledLetters(slot, word) {
+        const positions = slots.get(slot);
+        for (let idx = 0; idx < positions.length; idx++) {
+            const [row, col] = positions[idx];
+            const key = `${row},${col}`;
+            const preFilledLetter = cellContents.get(key);
+            if (preFilledLetter && preFilledLetter !== word[idx]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // AC-3 Algorithm with asynchronicity for better UI responsiveness
@@ -367,6 +381,12 @@
 
         outerLoop:
         for (const word1 of domainVar1) {
+            // Check if word1 matches pre-filled letters in var1
+            if (!wordMatchesPreFilledLetters(var1, word1)) {
+                revised = true;
+                continue;
+            }
+
             for (const word2 of domainVar2) {
                 if (wordsMatch(var1, word1, var2, word2)) {
                     newDomain.push(word1);
@@ -385,7 +405,7 @@
     // Backtracking Search with MRV and Degree Heuristics
     function backtrackingSolve(assignment = {}) {
         if (Object.keys(assignment).length === slots.size) {
-            solution = assignment;
+            solution = { ...assignment }; // Clone the assignment
             debugLog("Solution found:", solution);
             return true;
         }
@@ -457,6 +477,11 @@
 
     // Consistency check function
     function isConsistent(variable, value, assignment) {
+        // Check if value matches pre-filled letters in variable
+        if (!wordMatchesPreFilledLetters(variable, value)) {
+            return false;
+        }
+
         const neighbors = constraints.get(variable);
         if (!neighbors) return true;
 
@@ -488,7 +513,10 @@
         for (const neighbor of neighbors.keys()) {
             if (!(neighbor in assignment)) {
                 inferences[neighbor] = domains.get(neighbor).slice();
-                const newDomain = domains.get(neighbor).filter(val => wordsMatch(variable, value, neighbor, val));
+                const newDomain = domains.get(neighbor).filter(val => {
+                    // Ensure val matches pre-filled letters in neighbor
+                    return wordsMatch(variable, value, neighbor, val) && wordMatchesPreFilledLetters(neighbor, val);
+                });
                 if (newDomain.length === 0) {
                     debugLog(`Domain wiped out for ${neighbor} during forward checking.`);
                     return false;
