@@ -1,5 +1,3 @@
-// script.js
-
 // Global variables
 let grid = [];
 let words = [];
@@ -13,9 +11,31 @@ let domains = {};
 let cellContents = {};
 const DEBUG = false; // Toggle debug messages
 
+// Seeded randomization for reproducibility
+const RANDOM_SEED = 123;
+let seed = RANDOM_SEED;
+
+function seededRandom() {
+    let x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+}
+
+function shuffleWithSeed(array) {
+    let m = array.length, t, i;
+    while (m) {
+        i = Math.floor(seededRandom() * m--);
+        t = array[m];
+        array[m] = array[i];
+        array[i] = t;
+    }
+    return array;
+}
+
 // Helper function for logging
-function debugLog(message, ...optionalParams) {
-    if (DEBUG) console.log(message, ...optionalParams);
+function debugLog(message, flag = DEBUG, ...optionalParams) {
+    if (flag) {
+        console.log(message, ...optionalParams);
+    }
 }
 
 // Event listeners for buttons
@@ -258,24 +278,17 @@ function generateConstraints() {
     debugLog("Generated Constraints:", constraints);
 }
 
-// Set up domains for each slot, considering pre-filled letters
+// Set up domains for each slot using regex for faster filtering
 function setupDomains() {
     domains = {};
     for (const [slot, positions] of Object.entries(slots)) {
         const length = positions.length;
-        const preFilled = {};
-        positions.forEach(([r, c], idx) => {
-            const key = `${r},${c}`;
-            if (cellContents[key]) {
-                preFilled[idx] = cellContents[key];
-            }
-        });
-
+        let regexPattern = positions.map(([r, c]) => cellContents[`${r},${c}`] || '.').join('');
+        const regex = new RegExp(`^${regexPattern}$`);
+        
         const possibleWords = wordLengthCache[length] ? wordLengthCache[length] : [];
-        domains[slot] = possibleWords.filter(word => {
-            return Object.entries(preFilled).every(([idx, letter]) => word[idx] === letter);
-        });
-
+        domains[slot] = possibleWords.filter(word => regex.test(word));
+        
         if (domains[slot].length === 0) {
             console.warn(`Domain for slot ${slot} is empty after setup.`);
         }
@@ -284,7 +297,7 @@ function setupDomains() {
     debugLog("Domains after setup:", domains);
 }
 
-// AC-3 Algorithm
+// AC-3 Algorithm with asynchronicity for better UI responsiveness
 async function ac3() {
     const queue = [];
     for (const [var1, neighbors] of Object.entries(constraints)) {
@@ -312,6 +325,7 @@ async function ac3() {
     return true;
 }
 
+// Function to revise domains for consistency
 function revise(var1, var2) {
     let revised = false;
     const overlaps = constraints[var1][var2];
@@ -345,7 +359,7 @@ function revise(var1, var2) {
     return revised;
 }
 
-// Backtracking Search with Heuristics
+// Backtracking Search with MRV and Degree Heuristics
 function backtrackingSolve(assignment = {}) {
     if (Object.keys(assignment).length === Object.keys(domains).length) {
         solution = assignment;
@@ -372,14 +386,17 @@ function backtrackingSolve(assignment = {}) {
     return false;
 }
 
-// MRV and Degree Heuristic
+// MRV with degree heuristic tie-breaker
 function selectUnassignedVariable(assignment) {
     const unassignedVars = Object.keys(domains).filter(v => !(v in assignment));
     unassignedVars.sort((a, b) => {
+        if (a.endsWith("ACROSS") && b.endsWith("DOWN")) return -1;
+        if (a.endsWith("DOWN") && b.endsWith("ACROSS")) return 1;
+        
         const lenA = domains[a].length;
         const lenB = domains[b].length;
         if (lenA !== lenB) return lenA - lenB;
-
+        
         const degreeA = constraints[a] ? Object.keys(constraints[a]).length : 0;
         const degreeB = constraints[b] ? Object.keys(constraints[b]).length : 0;
         return degreeB - degreeA;
@@ -387,15 +404,17 @@ function selectUnassignedVariable(assignment) {
     return unassignedVars[0];
 }
 
-// Least Constraining Value Heuristic
+// Least Constraining Value heuristic with domain shuffling for randomization
 function orderDomainValues(variable, assignment) {
-    return domains[variable].slice().sort((a, b) => {
+    let domainValues = shuffleWithSeed(domains[variable].slice());
+    return domainValues.sort((a, b) => {
         const conflictsA = countConflicts(variable, a, assignment);
         const conflictsB = countConflicts(variable, b, assignment);
         return conflictsA - conflictsB;
     });
 }
 
+// Count conflicts for Least Constraining Value
 function countConflicts(variable, value, assignment) {
     let conflicts = 0;
     for (const neighbor in constraints[variable]) {
@@ -410,6 +429,7 @@ function countConflicts(variable, value, assignment) {
     return conflicts;
 }
 
+// Consistency check function
 function isConsistent(variable, value, assignment) {
     for (const neighbor in constraints[variable]) {
         if (neighbor in assignment) {
@@ -421,6 +441,7 @@ function isConsistent(variable, value, assignment) {
     return true;
 }
 
+// Check word alignment consistency
 function wordsMatch(var1, word1, var2, word2) {
     const overlaps = constraints[var1][var2];
     for (const [idx1, idx2] of overlaps) {
@@ -429,13 +450,12 @@ function wordsMatch(var1, word1, var2, word2) {
     return true;
 }
 
-// Forward Checking
+// Forward Checking with domain restoration
 function forwardCheck(variable, value, assignment) {
     const inferences = {};
     for (const neighbor in constraints[variable]) {
         if (!(neighbor in assignment)) {
             if (!inferences[neighbor]) inferences[neighbor] = domains[neighbor].slice();
-
             domains[neighbor] = domains[neighbor].filter(val => wordsMatch(variable, value, neighbor, val));
             if (!domains[neighbor].length) {
                 debugLog(`Domain wiped out for ${neighbor} during forward checking.`);
@@ -446,6 +466,7 @@ function forwardCheck(variable, value, assignment) {
     return inferences;
 }
 
+// Restore domain states after backtracking
 function restoreDomains(inferences) {
     if (!inferences) return;
     for (const variable in inferences) {
@@ -453,7 +474,7 @@ function restoreDomains(inferences) {
     }
 }
 
-// Solve the crossword
+// Solve the crossword with UI feedback and debug
 async function solveCrossword() {
     document.getElementById("result").textContent = "Setting up constraints...";
     generateSlots();
