@@ -302,7 +302,10 @@
         domains.clear();
         for (const [slot, positions] of slots.entries()) {
             const length = positions.length;
-            let regexPattern = positions.map(([r, c]) => cellContents.has(`${r},${c}`) ? cellContents.get(`${r},${c}`) : '.').join('');
+            let regexPattern = positions.map(([r, c]) => {
+                const content = cellContents.get(`${r},${c}`);
+                return content !== null && content !== undefined ? content : '.';
+            }).join('');
             const regex = new RegExp(`^${regexPattern}$`);
 
             const possibleWords = wordLengthCache.get(length) ? wordLengthCache.get(length) : [];
