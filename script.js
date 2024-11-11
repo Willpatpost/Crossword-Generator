@@ -21,6 +21,60 @@
     let isNumberEntryMode = false;
     let currentNumber = 1;
 
+    // Predefined puzzles
+    const predefinedPuzzles = [
+        {
+            name: "Easy",
+            grid: [
+                ["#", "#", "#", "#", "#", "#", "#"],
+                ["#", "1", " ", "2", " ", "3", "#"],
+                ["#", "#", "#", " ", "#", " ", "#"],
+                ["#", "#", "4", " ", "5", " ", "#"],
+                ["#", "6", "#", "7", " ", " ", "#"],
+                ["#", "8", " ", " ", " ", " ", "#"],
+                ["#", " ", "#", "#", " ", "#", "#"],
+                ["#", "#", "#", "#", "#", "#", "#"]
+            ]
+        },
+        {
+            name: "Medium",
+            grid: [
+                ["#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#"],
+                ["#", "#", "#", "1", " ", " ", " ", " ", " ", "2", "#", "#", "#", "#"],
+                ["#", "#", "#", " ", "#", "#", "#", "#", "#", " ", "#", "#", "3", "#"],
+                ["#", "#", "#", " ", "#", "#", "#", "#", "#", " ", "#", "#", " ", "#"],
+                ["#", "#", "#", " ", "#", "#", "4", " ", "5", " ", " ", "#", " ", "#"],
+                ["#", "#", "#", " ", "#", "#", "#", "#", " ", "#", "#", "#", " ", "#"],
+                ["#", "#", "#", "#", "#", "6", "#", "#", "7", " ", "8", " ", " ", "#"],
+                ["#", "#", "#", "#", "#", " ", "#", "#", " ", "#", " ", "#", " ", "#"],
+                ["#", "#", "9", "#", "10", " ", " ", " ", " ", "#", " ", "#", "#", "#"],
+                ["#", "#", " ", "#", "#", " ", "#", "#", " ", "#", " ", "#", "#", "#"],
+                ["#", "11", " ", " ", " ", " ", " ", "#", "#", "#", " ", "#", "#", "#"],
+                ["#", "#", " ", "#", "#", " ", "#", "#", "#", "#", " ", "#", "#", "#"],
+                ["#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#"]
+            ]
+        },
+        {
+            name: "Hard",
+            grid: [
+                ["#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#"],
+                ["#", "#", "#", "1", "2", "3", "#", "#", "#", "4", "5", "6", "#", "#", "#"],
+                ["#", "#", "7", " ", " ", " ", "8", "#", "9", " ", " ", " ", "10", "#", "#"],
+                ["#", "#", "11", " ", " ", " ", " ", "#", "12", " ", " ", " ", " ", "#", "#"],
+                ["#", "13", " ", " ", "#", "14", " ", "15", " ", " ", "#", "16", " ", "17", "#"],
+                ["#", "18", " ", " ", "19", "#", "20", " ", " ", "#", "21", " ", " ", " ", "#"],
+                ["#", "22", " ", " ", " ", "#", "23", " ", " ", "#", "24", " ", " ", " ", "#"],
+                ["#", "#", "25", " ", " ", "26", "#", "#", "#", "27", " ", " ", " ", "#", "#"],
+                ["#", "#", "#", "28", " ", " ", "29", "#", "30", " ", " ", " ", "#", "#", "#"],
+                ["#", "#", "#", "#", "31", " ", " ", "32", " ", " ", " ", "#", "#", "#", "#"],
+                ["#", "#", "#", "#", "#", "33", " ", " ", " ", " ", "#", "#", "#", "#", "#"],
+                ["#", "#", "#", "#", "#", "#", "N", "T", "H", "#", "#", "#", "#", "#", "#"],
+                ["#", "#", "#", "#", "#", "#", "#", " ", "#", "#", "#", "#", "#", "#", "#"],
+                ["#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#", "#"]
+            ]
+        }
+    ];
+
     // Seeded randomization using Linear Congruential Generator (LCG)
     function seededRandom() {
         const a = 1664525;
@@ -52,6 +106,11 @@
     document.getElementById("startNumberEntryButton").addEventListener("click", startNumberEntryMode);
     document.getElementById("stopNumberEntryButton").addEventListener("click", stopNumberEntryMode);
     document.getElementById("solveCrosswordButton").addEventListener("click", solveCrossword);
+
+    // Event listeners for predefined puzzles
+    document.getElementById("loadEasyPuzzle").addEventListener("click", () => loadPredefinedPuzzle("Easy"));
+    document.getElementById("loadMediumPuzzle").addEventListener("click", () => loadPredefinedPuzzle("Medium"));
+    document.getElementById("loadHardPuzzle").addEventListener("click", () => loadPredefinedPuzzle("Hard"));
 
     // Load words from an external file and cache by word length
     async function loadWords() {
@@ -87,6 +146,15 @@
 
     // Initialize the grid with black cells
     function generateGrid() {
+        // Clear any existing puzzle
+        grid = [];
+        solution = {};
+        slots.clear();
+        constraints.clear();
+        domains.clear();
+        cellContents.clear();
+        memoizedMaxNumber.value = null;
+
         const rows = parseInt(document.getElementById("rows").value);
         const cols = parseInt(document.getElementById("columns").value);
 
@@ -120,6 +188,70 @@
         gridContainer.appendChild(fragment);
         memoizedMaxNumber.value = null; // Reset memoization
         debugLog("Grid generated with rows:", rows, "columns:", cols);
+    }
+
+    // Load a predefined puzzle
+    function loadPredefinedPuzzle(puzzleName) {
+        const puzzle = predefinedPuzzles.find(p => p.name === puzzleName);
+        if (!puzzle) {
+            alert(`Puzzle ${puzzleName} not found.`);
+            return;
+        }
+
+        // Clear any existing puzzle
+        grid = [];
+        solution = {};
+        slots.clear();
+        constraints.clear();
+        domains.clear();
+        cellContents.clear();
+        memoizedMaxNumber.value = null;
+
+        const rows = puzzle.grid.length;
+        const cols = puzzle.grid[0].length;
+
+        // Initialize the grid
+        grid = puzzle.grid.map(row => row.slice()); // Deep copy to avoid modifying the original
+
+        const gridContainer = document.getElementById("gridContainer");
+        gridContainer.innerHTML = "";
+
+        // Batch DOM updates using DocumentFragment
+        const fragment = document.createDocumentFragment();
+
+        for (let r = 0; r < rows; r++) {
+            const rowDiv = document.createElement("div");
+            rowDiv.classList.add("grid-row");
+
+            for (let c = 0; c < cols; c++) {
+                const cellDiv = document.createElement("div");
+                const cellValue = grid[r][c];
+                cellDiv.classList.add("grid-cell");
+
+                cellDiv.dataset.row = r;
+                cellDiv.dataset.col = c;
+
+                if (cellValue === "#") {
+                    cellDiv.classList.add("black-cell");
+                } else if (/^\d+$/.test(cellValue)) {
+                    cellDiv.classList.add("white-cell", "numbered-cell");
+                    cellDiv.textContent = cellValue;
+                } else if (/^[A-Z]$/.test(cellValue)) {
+                    cellDiv.classList.add("white-cell", "prefilled-cell");
+                    cellDiv.textContent = cellValue;
+                } else {
+                    cellDiv.classList.add("white-cell");
+                }
+
+                cellDiv.addEventListener("click", () => toggleCellOrAddNumber(cellDiv));
+                rowDiv.appendChild(cellDiv);
+            }
+            fragment.appendChild(rowDiv);
+        }
+
+        gridContainer.appendChild(fragment);
+        memoizedMaxNumber.value = null; // Reset memoization
+        debugLog(`Loaded predefined puzzle: ${puzzleName}`);
     }
 
     // Toggle cell between black and white, add numbers, or pre-filled letters
