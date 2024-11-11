@@ -1,5 +1,4 @@
-// script.js
-
+// Global variables
 let grid = [];
 let words = [];
 let slots = {};
@@ -10,6 +9,34 @@ let currentNumber = 1;
 let wordLengthCache = {};
 let domains = {};
 let cellContents = {};
+const DEBUG = false; // Toggle debug messages
+
+// Seeded randomization for reproducibility
+const RANDOM_SEED = 123;
+let seed = RANDOM_SEED;
+
+function seededRandom() {
+    let x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+}
+
+function shuffleWithSeed(array) {
+    let m = array.length, t, i;
+    while (m) {
+        i = Math.floor(seededRandom() * m--);
+        t = array[m];
+        array[m] = array[i];
+        array[i] = t;
+    }
+    return array;
+}
+
+// Helper function for logging
+function debugLog(message, flag = DEBUG, ...optionalParams) {
+    if (flag) {
+        console.log(message, ...optionalParams);
+    }
+}
 
 // Event listeners for buttons
 document.getElementById("generateGridButton").addEventListener("click", generateGrid);
@@ -25,11 +52,16 @@ async function loadWords() {
 
         const text = await response.text();
         words = text.split('\n').map(word => word.trim().toUpperCase());
+        
+        if (!words.every(word => /^[A-Z]+$/.test(word))) {
+            throw new Error("File contains invalid words. Ensure all entries are alphabetic.");
+        }
+        
         cacheWordsByLength();
-        console.log("Words loaded:", words.length);
+        debugLog("Words loaded:", words.length);
     } catch (error) {
         console.error("Error loading words:", error);
-        alert("Error loading words. Please check if Words.txt is available.");
+        alert("Error loading words. Please check if Words.txt is available and correctly formatted.");
     }
 }
 
@@ -41,7 +73,7 @@ function cacheWordsByLength() {
         if (!wordLengthCache[len]) wordLengthCache[len] = [];
         wordLengthCache[len].push(word);
     }
-    console.log("Word length cache created.");
+    debugLog("Word length cache created.");
 }
 
 // Initialize the grid with black cells
@@ -73,7 +105,7 @@ function generateGrid() {
         gridContainer.appendChild(rowDiv);
     }
 
-    console.log("Grid generated with rows:", rows, "columns:", cols);
+    debugLog("Grid generated with rows:", rows, "columns:", cols);
 }
 
 // Toggle cell between black and white, add numbers, or pre-filled letters
@@ -94,7 +126,6 @@ function toggleCellOrAddNumber(cell) {
         cell.textContent = "";
         grid[row][col] = " ";
     } else if (cell.classList.contains("white-cell")) {
-        // Toggle between white cell and pre-filled letter mode
         let letter = prompt("Enter a letter (or leave blank to toggle back to black):");
         if (letter) {
             letter = letter.toUpperCase();
@@ -123,14 +154,14 @@ function startNumberEntryMode() {
     currentNumber = getMaxNumberOnGrid() + 1;
     isNumberEntryMode = true;
     document.getElementById("stopNumberEntryButton").style.display = "inline";
-    console.log("Number entry mode started. Current number:", currentNumber);
+    debugLog("Number entry mode started. Current number:", currentNumber);
 }
 
 // Stop number-entry mode
 function stopNumberEntryMode() {
     isNumberEntryMode = false;
     document.getElementById("stopNumberEntryButton").style.display = "none";
-    console.log("Number entry mode stopped.");
+    debugLog("Number entry mode stopped.");
 }
 
 // Get the maximum number currently on the grid
@@ -154,26 +185,21 @@ function generateSlots() {
     const rows = grid.length;
     const cols = grid[0].length;
 
-    // Identify cells with pre-filled letters or numbers
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             const cell = grid[r][c];
             if (/^[A-Z]$/.test(cell)) {
                 cellContents[`${r},${c}`] = cell;
             } else if (cell !== "#" && cell.trim() !== "") {
-                // Cells with numbers
                 cellContents[`${r},${c}`] = null;
             }
         }
     }
 
-    // Generate slots only for numbered cells
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             const cell = grid[r][c];
-
             if (/^\d+$/.test(cell)) {
-                // Check for across slot
                 if (c === 0 || grid[r][c - 1] === "#") {
                     const positions = getSlotPositions(r, c, "across");
                     if (positions.length >= 2) {
@@ -181,7 +207,6 @@ function generateSlots() {
                         slots[slotName] = positions;
                     }
                 }
-                // Check for down slot
                 if (r === 0 || grid[r - 1][c] === "#") {
                     const positions = getSlotPositions(r, c, "down");
                     if (positions.length >= 2) {
@@ -193,7 +218,7 @@ function generateSlots() {
         }
     }
 
-    console.log("Generated Slots:", slots);
+    debugLog("Generated Slots:", slots);
 
     generateConstraints();
     setupDomains();
@@ -250,37 +275,30 @@ function generateConstraints() {
         }
     }
 
-    console.log("Generated Constraints:", constraints);
+    debugLog("Generated Constraints:", constraints);
 }
 
-// Set up domains for each slot, considering pre-filled letters
+// Set up domains for each slot using regex for faster filtering
 function setupDomains() {
     domains = {};
     for (const [slot, positions] of Object.entries(slots)) {
         const length = positions.length;
-        const preFilled = {};
-        positions.forEach(([r, c], idx) => {
-            const key = `${r},${c}`;
-            if (cellContents[key]) {
-                preFilled[idx] = cellContents[key];
-            }
-        });
-
+        let regexPattern = positions.map(([r, c]) => cellContents[`${r},${c}`] || '.').join('');
+        const regex = new RegExp(`^${regexPattern}$`);
+        
         const possibleWords = wordLengthCache[length] ? wordLengthCache[length] : [];
-        domains[slot] = possibleWords.filter(word => {
-            return Object.entries(preFilled).every(([idx, letter]) => word[idx] === letter);
-        });
-
+        domains[slot] = possibleWords.filter(word => regex.test(word));
+        
         if (domains[slot].length === 0) {
             console.warn(`Domain for slot ${slot} is empty after setup.`);
         }
     }
 
-    console.log("Domains after setup:", domains);
+    debugLog("Domains after setup:", domains);
 }
 
-// AC-3 Algorithm
-function ac3() {
+// AC-3 Algorithm with asynchronicity for better UI responsiveness
+async function ac3() {
     const queue = [];
     for (const [var1, neighbors] of Object.entries(constraints)) {
         for (const var2 of Object.keys(neighbors)) {
@@ -288,12 +306,12 @@ function ac3() {
         }
     }
 
-    console.log("Initial AC-3 queue:", queue);
+    debugLog("Initial AC-3 queue:", queue);
 
     while (queue.length) {
         const [var1, var2] = queue.shift();
         if (revise(var1, var2)) {
-            console.log(`Revised ${var1}, new domain:`, domains[var1]);
+            debugLog(`Revised ${var1}, new domain:`, domains[var1]);
             if (!domains[var1].length) {
                 console.error(`Domain wiped out for ${var1} during AC-3.`);
                 return false;
@@ -302,10 +320,12 @@ function ac3() {
                 if (neighbor !== var2) queue.push([neighbor, var1]);
             }
         }
+        await new Promise(resolve => setTimeout(resolve, 0)); // Yield control to the browser
     }
     return true;
 }
 
+// Function to revise domains for consistency
 function revise(var1, var2) {
     let revised = false;
     const overlaps = constraints[var1][var2];
@@ -339,19 +359,19 @@ function revise(var1, var2) {
     return revised;
 }
 
-// Backtracking Search with Heuristics
+// Backtracking Search with MRV and Degree Heuristics
 function backtrackingSolve(assignment = {}) {
     if (Object.keys(assignment).length === Object.keys(domains).length) {
         solution = assignment;
-        console.log("Solution found:", solution);
+        debugLog("Solution found:", solution);
         return true;
     }
 
     const varToAssign = selectUnassignedVariable(assignment);
-    console.log("Selecting variable to assign:", varToAssign);
+    debugLog("Selecting variable to assign:", varToAssign);
 
     for (const value of orderDomainValues(varToAssign, assignment)) {
-        console.log(`Trying ${value} for ${varToAssign}`);
+        debugLog(`Trying ${value} for ${varToAssign}`);
         if (isConsistent(varToAssign, value, assignment)) {
             assignment[varToAssign] = value;
             const inferences = forwardCheck(varToAssign, value, assignment);
@@ -366,14 +386,17 @@ function backtrackingSolve(assignment = {}) {
     return false;
 }
 
-// MRV and Degree Heuristic
+// MRV with degree heuristic tie-breaker
 function selectUnassignedVariable(assignment) {
     const unassignedVars = Object.keys(domains).filter(v => !(v in assignment));
     unassignedVars.sort((a, b) => {
+        if (a.endsWith("ACROSS") && b.endsWith("DOWN")) return -1;
+        if (a.endsWith("DOWN") && b.endsWith("ACROSS")) return 1;
+        
         const lenA = domains[a].length;
         const lenB = domains[b].length;
         if (lenA !== lenB) return lenA - lenB;
-
+        
         const degreeA = constraints[a] ? Object.keys(constraints[a]).length : 0;
         const degreeB = constraints[b] ? Object.keys(constraints[b]).length : 0;
         return degreeB - degreeA;
@@ -381,15 +404,17 @@ function selectUnassignedVariable(assignment) {
     return unassignedVars[0];
 }
 
-// Least Constraining Value Heuristic
+// Least Constraining Value heuristic with domain shuffling for randomization
 function orderDomainValues(variable, assignment) {
-    return domains[variable].slice().sort((a, b) => {
+    let domainValues = shuffleWithSeed(domains[variable].slice());
+    return domainValues.sort((a, b) => {
         const conflictsA = countConflicts(variable, a, assignment);
         const conflictsB = countConflicts(variable, b, assignment);
         return conflictsA - conflictsB;
     });
 }
 
+// Count conflicts for Least Constraining Value
 function countConflicts(variable, value, assignment) {
     let conflicts = 0;
     for (const neighbor in constraints[variable]) {
@@ -404,6 +429,7 @@ function countConflicts(variable, value, assignment) {
     return conflicts;
 }
 
+// Consistency check function
 function isConsistent(variable, value, assignment) {
     for (const neighbor in constraints[variable]) {
         if (neighbor in assignment) {
@@ -415,6 +441,7 @@ function isConsistent(variable, value, assignment) {
     return true;
 }
 
+// Check word alignment consistency
 function wordsMatch(var1, word1, var2, word2) {
     const overlaps = constraints[var1][var2];
     for (const [idx1, idx2] of overlaps) {
@@ -423,16 +450,15 @@ function wordsMatch(var1, word1, var2, word2) {
     return true;
 }
 
-// Forward Checking
+// Forward Checking with domain restoration
 function forwardCheck(variable, value, assignment) {
     const inferences = {};
     for (const neighbor in constraints[variable]) {
         if (!(neighbor in assignment)) {
             if (!inferences[neighbor]) inferences[neighbor] = domains[neighbor].slice();
-
             domains[neighbor] = domains[neighbor].filter(val => wordsMatch(variable, value, neighbor, val));
             if (!domains[neighbor].length) {
-                console.warn(`Domain wiped out for ${neighbor} during forward checking.`);
+                debugLog(`Domain wiped out for ${neighbor} during forward checking.`);
                 return false;
             }
         }
@@ -440,6 +466,7 @@ function forwardCheck(variable, value, assignment) {
     return inferences;
 }
 
+// Restore domain states after backtracking
 function restoreDomains(inferences) {
     if (!inferences) return;
     for (const variable in inferences) {
@@ -447,21 +474,24 @@ function restoreDomains(inferences) {
     }
 }
 
-// Solve the crossword
+// Solve the crossword with UI feedback and debug
 async function solveCrossword() {
+    document.getElementById("result").textContent = "Setting up constraints...";
     generateSlots();
+
     if (Object.keys(slots).length === 0) {
         alert("No numbered slots found to solve.");
         return;
     }
 
-    // Allow UI to update before starting the solver
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise(resolve => setTimeout(resolve, 10)); // Allow UI update
 
-    console.log("Starting AC-3 algorithm...");
-    if (ac3()) {
-        console.log("AC-3 algorithm completed successfully.");
-        console.log("Starting backtracking search...");
+    debugLog("Starting AC-3 algorithm...");
+    document.getElementById("result").textContent = "Running AC-3 algorithm...";
+
+    if (await ac3()) {
+        debugLog("AC-3 algorithm completed successfully.");
+        document.getElementById("result").textContent = "Starting backtracking search...";
         const result = backtrackingSolve();
         if (result) {
             displaySolution();
@@ -488,7 +518,7 @@ function displaySolution() {
             }
         });
     }
-    console.log("Solution displayed on the grid.");
+    debugLog("Solution displayed on the grid.");
 }
 
 // Display word list organized by slot number and direction
