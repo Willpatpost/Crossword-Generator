@@ -308,7 +308,9 @@ async function ac3() {
     const queue = [];
     for (const [var1, neighbors] of constraints) {
         for (const var2 of neighbors.keys()) {
-            queue.push([var1, var2]);
+            if (constraints.get(var1) && constraints.get(var1).get(var2)) {
+                queue.push([var1, var2]);
+            }
         }
     }
 
@@ -334,12 +336,14 @@ async function ac3() {
 // Function to revise domains for consistency
 function revise(var1, var2) {
     let revised = false;
-    const overlaps = constraints[var1][var2];
+    const overlaps = constraints.get(var1)?.get(var2);
+
+    if (!overlaps) return false; // If there are no constraints, skip
 
     const newDomain = [];
-    for (const word1 of domains[var1]) {
+    for (const word1 of domains.get(var1)) {
         let satisfies = false;
-        for (const word2 of domains[var2]) {
+        for (const word2 of domains.get(var2)) {
             let match = true;
             for (const [idx1, idx2] of overlaps) {
                 if (word1[idx1] !== word2[idx2]) {
@@ -360,7 +364,7 @@ function revise(var1, var2) {
     }
 
     if (revised) {
-        domains[var1] = newDomain;
+        domains.set(var1, newDomain); // Update the domain in the Map
     }
     return revised;
 }
