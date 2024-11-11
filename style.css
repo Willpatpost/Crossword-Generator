@@ -187,6 +187,10 @@ button:active {
     #gridContainer {
         transform: scale(0.9);
     }
+    #predefinedPuzzles button {
+        font-size: 0.9em;
+        padding: 8px 15px;
+    }
 }
 
 /* Loading spinner */
@@ -203,4 +207,36 @@ button:active {
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+/* Styling for predefined puzzles section */
+#predefinedPuzzles {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+#predefinedPuzzles h2 {
+    margin-bottom: 10px;
+    font-size: 1.5em;
+}
+
+#predefinedPuzzles button {
+    padding: 10px 20px;
+    margin: 5px;
+    background-color: #17a2b8;
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    font-weight: 500;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+#predefinedPuzzles button:hover {
+    background-color: #138496;
+    transform: scale(1.05);
+}
+
+#predefinedPuzzles button:active {
+    transform: scale(1);
 }
