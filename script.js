@@ -561,27 +561,34 @@
         const unassignedVars = Array.from(domains.keys()).filter(v => !(v in assignment));
         if (unassignedVars.length === 0) return null;
     
-        // Sort by MRV (smallest domain first)
-        unassignedVars.sort((a, b) => domains.get(a).length - domains.get(b).length);
+        // Sort by MRV, tie-breaking with the degree heuristic
+        unassignedVars.sort((a, b) => {
+            const lenA = domains.get(a).length;
+            const lenB = domains.get(b).length;
+            if (lenA !== lenB) return lenA - lenB;
+    
+            const degreeA = constraints.get(a) ? constraints.get(a).size : 0;
+            const degreeB = constraints.get(b) ? constraints.get(b).size : 0;
+            return degreeB - degreeA;
+        });
         return unassignedVars[0];
     }
 
     // Least Constraining Value heuristic with domain shuffling for randomization
     function orderDomainValues(variable, assignment) {
-        let domainValues = shuffleWithSeed(domains.get(variable).slice());
+        const domainValues = domains.get(variable).slice();
         return domainValues.sort((a, b) => {
             const conflictsA = countConflicts(variable, a, assignment);
             const conflictsB = countConflicts(variable, b, assignment);
-            return conflictsA - conflictsB;
+            return conflictsA - conflictsB; // Least constraining first
         });
     }
-
-    // Count conflicts for Least Constraining Value
+    
     function countConflicts(variable, value, assignment) {
         let conflicts = 0;
         const neighbors = constraints.get(variable);
         if (!neighbors) return conflicts;
-
+    
         for (const neighbor of neighbors.keys()) {
             if (!(neighbor in assignment)) {
                 for (const neighborValue of domains.get(neighbor)) {
@@ -605,7 +612,6 @@
     
         for (const neighbor of neighbors.keys()) {
             if (!(neighbor in assignment)) {
-                // Forward check: ensure the neighbor has a compatible value left
                 const newDomain = domains.get(neighbor).filter(neighborValue => {
                     return wordsMatch(variable, value, neighbor, neighborValue);
                 });
