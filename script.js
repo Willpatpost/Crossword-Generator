@@ -679,17 +679,24 @@
     
         // Start profiling for AC-3
         console.time("AC-3 Execution");
-        if (await ac3()) {
-            console.timeEnd("AC-3 Execution");  // End profiling for AC-3
+        const ac3Result = await ac3();
+        console.timeEnd("AC-3 Execution");
     
-            debugLog("AC-3 algorithm completed successfully.");
-            document.getElementById("result").textContent = "Starting backtracking search...";
-            
-            // Start profiling for backtracking search
-            console.time("Backtracking Execution");
+        // Log domain sizes and check for empty domains
+        let hasEmptyDomain = false;
+        for (const [slot, domain] of domains.entries()) {
+            if (domain.length === 0) {
+                console.warn(`Domain for ${slot} is empty after AC-3. Falling back to backtracking.`);
+                hasEmptyDomain = true;
+            } else {
+                console.log(`Domain for ${slot} has ${domain.length} options.`);
+            }
+        }
+    
+        if (!ac3Result || hasEmptyDomain) {
+            // AC-3 failed or resulted in empty domains
+            console.warn("AC-3 failed or over-pruned; attempting backtracking without full arc consistency.");
             const result = backtrackingSolve();
-            console.timeEnd("Backtracking Execution"); // End profiling for backtracking search
-    
             if (result) {
                 displaySolution();
                 document.getElementById("result").textContent = "Crossword solved!";
@@ -698,17 +705,22 @@
                 document.getElementById("result").textContent = "No possible solution.";
             }
         } else {
-            console.timeEnd("AC-3 Execution"); // Ensure this ends if AC-3 fails
-            document.getElementById("result").textContent = "No solution due to constraints.";
-        }
-
-        for (const [slot, domain] of domains.entries()) {
-            if (domain.length === 0) {
-                console.warn(`Domain for ${slot} is empty after AC-3.`);
+            // AC-3 succeeded, continue with regular backtracking
+            document.getElementById("result").textContent = "Starting backtracking search...";
+            
+            // Start profiling for backtracking search
+            console.time("Backtracking Execution");
+            const result = backtrackingSolve();
+            console.timeEnd("Backtracking Execution");
+    
+            if (result) {
+                displaySolution();
+                document.getElementById("result").textContent = "Crossword solved!";
+                displayWordList();
             } else {
-                console.log(`Domain for ${slot} has ${domain.length} options.`);
+                document.getElementById("result").textContent = "No possible solution.";
             }
-        } 
+        }
     }
 
     // Display the solution on the grid
