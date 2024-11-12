@@ -561,7 +561,6 @@
         const unassignedVars = Array.from(domains.keys()).filter(v => !(v in assignment));
         if (unassignedVars.length === 0) return null;
     
-        // Sort by MRV, tie-breaking with the degree heuristic
         unassignedVars.sort((a, b) => {
             const lenA = domains.get(a).length;
             const lenB = domains.get(b).length;
@@ -569,7 +568,10 @@
     
             const degreeA = constraints.get(a) ? constraints.get(a).size : 0;
             const degreeB = constraints.get(b) ? constraints.get(b).size : 0;
-            return degreeB - degreeA;
+            if (degreeA !== degreeB) return degreeB - degreeA;
+    
+            // Introduce slight randomness for variables with identical MRV and degree
+            return Math.random() - 0.5;
         });
         return unassignedVars[0];
     }
@@ -667,6 +669,9 @@
 
     // Solve the crossword with UI feedback and debug
     async function solveCrossword() {
+        // Shuffle domains for randomness
+        randomizeDomains();
+    
         document.getElementById("result").textContent = "Setting up constraints...";
         generateSlots();
     
@@ -710,7 +715,7 @@
         } else {
             // AC-3 succeeded, continue with regular backtracking
             document.getElementById("result").textContent = "Starting backtracking search...";
-            
+    
             // Start profiling for backtracking search
             console.time("Backtracking Execution");
             const result = backtrackingSolve();
@@ -723,6 +728,21 @@
             } else {
                 document.getElementById("result").textContent = "No possible solution.";
             }
+        }
+    }
+    
+    // Helper function to shuffle an array (Fisher-Yates algorithm)
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+    
+    // Shuffle domains to introduce randomness in value order
+    function randomizeDomains() {
+        for (const domain of domains.values()) {
+            shuffleArray(domain);
         }
     }
 
