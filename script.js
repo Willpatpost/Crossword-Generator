@@ -561,16 +561,8 @@
         const unassignedVars = Array.from(domains.keys()).filter(v => !(v in assignment));
         if (unassignedVars.length === 0) return null;
     
-        // Sort variables by MRV, and break ties with degree heuristic
-        unassignedVars.sort((a, b) => {
-            const lenA = domains.get(a).length;
-            const lenB = domains.get(b).length;
-            if (lenA !== lenB) return lenA - lenB;
-    
-            const degreeA = constraints.get(a) ? constraints.get(a).size : 0;
-            const degreeB = constraints.get(b) ? constraints.get(b).size : 0;
-            return degreeB - degreeA;
-        });
+        // Sort by MRV (smallest domain first)
+        unassignedVars.sort((a, b) => domains.get(a).length - domains.get(b).length);
         return unassignedVars[0];
     }
 
@@ -604,19 +596,24 @@
 
     // Consistency check function
     function isConsistent(variable, value, assignment) {
-        // Check if value matches pre-filled letters in variable
         if (!wordMatchesPreFilledLetters(variable, value)) {
             return false;
         }
-
+    
         const neighbors = constraints.get(variable);
         if (!neighbors) return true;
-
+    
         for (const neighbor of neighbors.keys()) {
-            if (neighbor in assignment) {
-                if (!wordsMatch(variable, value, neighbor, assignment[neighbor])) {
-                    return false;
+            if (!(neighbor in assignment)) {
+                // Forward check: ensure the neighbor has a compatible value left
+                const newDomain = domains.get(neighbor).filter(neighborValue => {
+                    return wordsMatch(variable, value, neighbor, neighborValue);
+                });
+                if (newDomain.length === 0) {
+                    return false; // Forward check failure
                 }
+            } else if (!wordsMatch(variable, value, neighbor, assignment[neighbor])) {
+                return false;
             }
         }
         return true;
