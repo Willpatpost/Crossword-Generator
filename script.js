@@ -469,36 +469,31 @@
 
     // AC-3 Algorithm with asynchronicity for better UI responsiveness
     async function ac3() {
-        const queue = [];
+    const queue = [];
 
-        for (const [var1, neighbors] of constraints.entries()) {
-            for (const var2 of neighbors.keys()) {
-                queue.push([var1, var2]);
-            }
+    for (const [var1, neighbors] of constraints.entries()) {
+        for (const var2 of neighbors.keys()) {
+            queue.push([var1, var2]);
         }
+    }
 
-        // Prioritize variables with smaller domains
-        queue.sort((a, b) => domains.get(a[0]).length - domains.get(b[0]).length);
+    // Prioritize variables with smaller domains
+    queue.sort((a, b) => domains.get(a[0]).length - domains.get(b[0]).length);
 
-        debugLog("Initial AC-3 queue:", queue);
-
-        while (queue.length) {
-            const [var1, var2] = queue.shift();
-            if (revise(var1, var2)) {
-                debugLog(`Revised ${var1}, new domain:`, domains.get(var1));
-                if (!domains.get(var1).length) {
-                    console.error(`Domain wiped out for ${var1} during AC-3.`);
-                    return false;
-                }
-                for (const neighbor of constraints.get(var1).keys()) {
-                    if (neighbor !== var2) queue.push([neighbor, var1]);
-                }
-                // Re-sort the queue
-                queue.sort((a, b) => domains.get(a[0]).length - domains.get(b[0]).length);
+    while (queue.length) {
+        const [var1, var2] = queue.shift();
+        if (revise(var1, var2)) {
+            if (!domains.get(var1).length) {
+                return false;
             }
-            await new Promise(resolve => setTimeout(resolve, 0)); // Yield control to the browser
+            for (const neighbor of constraints.get(var1).keys()) {
+                if (neighbor !== var2) queue.push([neighbor, var1]);
+            }
+            queue.sort((a, b) => domains.get(a[0]).length - domains.get(b[0]).length);
         }
-        return true;
+        await new Promise(resolve => setTimeout(resolve, 0)); // Yield to UI
+    }
+    return true;
     }
 
     // Function to revise domains for consistency
@@ -566,12 +561,13 @@
     function selectUnassignedVariable(assignment) {
         const unassignedVars = Array.from(domains.keys()).filter(v => !(v in assignment));
         if (unassignedVars.length === 0) return null;
-
+    
+        // Sort variables by MRV, and break ties with degree heuristic
         unassignedVars.sort((a, b) => {
             const lenA = domains.get(a).length;
             const lenB = domains.get(b).length;
             if (lenA !== lenB) return lenA - lenB;
-
+    
             const degreeA = constraints.get(a) ? constraints.get(a).size : 0;
             const degreeB = constraints.get(b) ? constraints.get(b).size : 0;
             return degreeB - degreeA;
@@ -671,21 +667,30 @@
     async function solveCrossword() {
         document.getElementById("result").textContent = "Setting up constraints...";
         generateSlots();
-
+    
         if (slots.size === 0) {
             alert("No numbered slots found to solve.");
             return;
         }
-
+    
         await new Promise(resolve => setTimeout(resolve, 10)); // Allow UI update
-
+    
         debugLog("Starting AC-3 algorithm...");
         document.getElementById("result").textContent = "Running AC-3 algorithm...";
-
+    
+        // Start profiling for AC-3
+        console.time("AC-3 Execution");
         if (await ac3()) {
+            console.timeEnd("AC-3 Execution");  // End profiling for AC-3
+    
             debugLog("AC-3 algorithm completed successfully.");
             document.getElementById("result").textContent = "Starting backtracking search...";
+            
+            // Start profiling for backtracking search
+            console.time("Backtracking Execution");
             const result = backtrackingSolve();
+            console.timeEnd("Backtracking Execution"); // End profiling for backtracking search
+    
             if (result) {
                 displaySolution();
                 document.getElementById("result").textContent = "Crossword solved!";
@@ -694,6 +699,7 @@
                 document.getElementById("result").textContent = "No possible solution.";
             }
         } else {
+            console.timeEnd("AC-3 Execution"); // Ensure this ends if AC-3 fails
             document.getElementById("result").textContent = "No solution due to constraints.";
         }
     }
