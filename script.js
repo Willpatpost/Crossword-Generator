@@ -489,7 +489,6 @@
             for (const neighbor of constraints.get(var1).keys()) {
                 if (neighbor !== var2) queue.push([neighbor, var1]);
             }
-            queue.sort((a, b) => domains.get(a[0]).length - domains.get(b[0]).length);
         }
         await new Promise(resolve => setTimeout(resolve, 0)); // Yield to UI
     }
@@ -702,6 +701,14 @@
             console.timeEnd("AC-3 Execution"); // Ensure this ends if AC-3 fails
             document.getElementById("result").textContent = "No solution due to constraints.";
         }
+
+        for (const [slot, domain] of domains.entries()) {
+            if (domain.length === 0) {
+                console.warn(`Domain for ${slot} is empty after AC-3.`);
+            } else {
+                console.log(`Domain for ${slot} has ${domain.length} options.`);
+            }
+        } 
     }
 
     // Display the solution on the grid
