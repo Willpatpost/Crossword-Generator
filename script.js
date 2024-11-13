@@ -4,7 +4,7 @@
     // Constants and configurations
     const DEBUG = false; // Toggle debug messages
     const RANDOM_SEED = 123;
-    let seed = RANDOM_SEED;
+    let seed = Math.floor(Math.random() * 1000000); // Randomize seed on each run
 
     // Cached data
     const wordLengthCache = new Map();
@@ -565,12 +565,12 @@
             const lenA = domains.get(a).length;
             const lenB = domains.get(b).length;
             if (lenA !== lenB) return lenA - lenB;
-    
+        
             const degreeA = constraints.get(a) ? constraints.get(a).size : 0;
             const degreeB = constraints.get(b) ? constraints.get(b).size : 0;
             if (degreeA !== degreeB) return degreeB - degreeA;
-    
-            // Introduce slight randomness for variables with identical MRV and degree
+        
+            // Introduce slight randomness
             return Math.random() - 0.5;
         });
         return unassignedVars[0];
@@ -579,10 +579,11 @@
     // Least Constraining Value heuristic with domain shuffling for randomization
     function orderDomainValues(variable, assignment) {
         const domainValues = domains.get(variable).slice();
+        shuffleArray(domainValues); // Randomize order before sorting
         return domainValues.sort((a, b) => {
             const conflictsA = countConflicts(variable, a, assignment);
             const conflictsB = countConflicts(variable, b, assignment);
-            return conflictsA - conflictsB; // Least constraining first
+            return conflictsA - conflictsB;
         });
     }
     
