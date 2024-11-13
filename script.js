@@ -469,36 +469,30 @@
 
     // AC-3 Algorithm with asynchronicity for better UI responsiveness
     async function ac3() {
-        const queue = [];
+    const queue = [];
 
-        for (const [var1, neighbors] of constraints.entries()) {
-            for (const var2 of neighbors.keys()) {
-                queue.push([var1, var2]);
+    for (const [var1, neighbors] of constraints.entries()) {
+        for (const var2 of neighbors.keys()) {
+            queue.push([var1, var2]);
+        }
+    }
+
+    // Prioritize variables with smaller domains
+    queue.sort((a, b) => domains.get(a[0]).length - domains.get(b[0]).length);
+
+    while (queue.length) {
+        const [var1, var2] = queue.shift();
+        if (revise(var1, var2)) {
+            if (!domains.get(var1).length) {
+                return false;
+            }
+            for (const neighbor of constraints.get(var1).keys()) {
+                if (neighbor !== var2) queue.push([neighbor, var1]);
             }
         }
-
-        // Prioritize variables with smaller domains
-        queue.sort((a, b) => domains.get(a[0]).length - domains.get(b[0]).length);
-
-        debugLog("Initial AC-3 queue:", queue);
-
-        while (queue.length) {
-            const [var1, var2] = queue.shift();
-            if (revise(var1, var2)) {
-                debugLog(`Revised ${var1}, new domain:`, domains.get(var1));
-                if (!domains.get(var1).length) {
-                    console.error(`Domain wiped out for ${var1} during AC-3.`);
-                    return false;
-                }
-                for (const neighbor of constraints.get(var1).keys()) {
-                    if (neighbor !== var2) queue.push([neighbor, var1]);
-                }
-                // Re-sort the queue
-                queue.sort((a, b) => domains.get(a[0]).length - domains.get(b[0]).length);
-            }
-            await new Promise(resolve => setTimeout(resolve, 0)); // Yield control to the browser
-        }
-        return true;
+        await new Promise(resolve => setTimeout(resolve, 0)); // Yield to UI
+    }
+    return true;
     }
 
     // Function to revise domains for consistency
@@ -566,35 +560,37 @@
     function selectUnassignedVariable(assignment) {
         const unassignedVars = Array.from(domains.keys()).filter(v => !(v in assignment));
         if (unassignedVars.length === 0) return null;
-
+    
         unassignedVars.sort((a, b) => {
             const lenA = domains.get(a).length;
             const lenB = domains.get(b).length;
             if (lenA !== lenB) return lenA - lenB;
-
+    
             const degreeA = constraints.get(a) ? constraints.get(a).size : 0;
             const degreeB = constraints.get(b) ? constraints.get(b).size : 0;
-            return degreeB - degreeA;
+            if (degreeA !== degreeB) return degreeB - degreeA;
+    
+            // Introduce slight randomness for variables with identical MRV and degree
+            return Math.random() - 0.5;
         });
         return unassignedVars[0];
     }
 
     // Least Constraining Value heuristic with domain shuffling for randomization
     function orderDomainValues(variable, assignment) {
-        let domainValues = shuffleWithSeed(domains.get(variable).slice());
+        const domainValues = domains.get(variable).slice();
         return domainValues.sort((a, b) => {
             const conflictsA = countConflicts(variable, a, assignment);
             const conflictsB = countConflicts(variable, b, assignment);
-            return conflictsA - conflictsB;
+            return conflictsA - conflictsB; // Least constraining first
         });
     }
-
-    // Count conflicts for Least Constraining Value
+    
     function countConflicts(variable, value, assignment) {
         let conflicts = 0;
         const neighbors = constraints.get(variable);
         if (!neighbors) return conflicts;
-
+    
         for (const neighbor of neighbors.keys()) {
             if (!(neighbor in assignment)) {
                 for (const neighborValue of domains.get(neighbor)) {
@@ -609,19 +605,23 @@
 
     // Consistency check function
     function isConsistent(variable, value, assignment) {
-        // Check if value matches pre-filled letters in variable
         if (!wordMatchesPreFilledLetters(variable, value)) {
             return false;
         }
-
+    
         const neighbors = constraints.get(variable);
         if (!neighbors) return true;
-
+    
         for (const neighbor of neighbors.keys()) {
-            if (neighbor in assignment) {
-                if (!wordsMatch(variable, value, neighbor, assignment[neighbor])) {
-                    return false;
+            if (!(neighbor in assignment)) {
+                const newDomain = domains.get(neighbor).filter(neighborValue => {
+                    return wordsMatch(variable, value, neighbor, neighborValue);
+                });
+                if (newDomain.length === 0) {
+                    return false; // Forward check failure
                 }
+            } else if (!wordsMatch(variable, value, neighbor, assignment[neighbor])) {
+                return false;
             }
         }
         return true;
@@ -669,22 +669,41 @@
 
     // Solve the crossword with UI feedback and debug
     async function solveCrossword() {
+        // Shuffle domains for randomness
+        randomizeDomains();
+    
         document.getElementById("result").textContent = "Setting up constraints...";
         generateSlots();
-
+    
         if (slots.size === 0) {
             alert("No numbered slots found to solve.");
             return;
         }
-
+    
         await new Promise(resolve => setTimeout(resolve, 10)); // Allow UI update
-
+    
         debugLog("Starting AC-3 algorithm...");
         document.getElementById("result").textContent = "Running AC-3 algorithm...";
-
-        if (await ac3()) {
-            debugLog("AC-3 algorithm completed successfully.");
-            document.getElementById("result").textContent = "Starting backtracking search...";
+    
+        // Start profiling for AC-3
+        console.time("AC-3 Execution");
+        const ac3Result = await ac3();
+        console.timeEnd("AC-3 Execution");
+    
+        // Log domain sizes and check for empty domains
+        let hasEmptyDomain = false;
+        for (const [slot, domain] of domains.entries()) {
+            if (domain.length === 0) {
+                console.warn(`Domain for ${slot} is empty after AC-3. Falling back to backtracking.`);
+                hasEmptyDomain = true;
+            } else {
+                console.log(`Domain for ${slot} has ${domain.length} options.`);
+            }
+        }
+    
+        if (!ac3Result || hasEmptyDomain) {
+            // AC-3 failed or resulted in empty domains
+            console.warn("AC-3 failed or over-pruned; attempting backtracking without full arc consistency.");
             const result = backtrackingSolve();
             if (result) {
                 displaySolution();
@@ -694,7 +713,36 @@
                 document.getElementById("result").textContent = "No possible solution.";
             }
         } else {
-            document.getElementById("result").textContent = "No solution due to constraints.";
+            // AC-3 succeeded, continue with regular backtracking
+            document.getElementById("result").textContent = "Starting backtracking search...";
+    
+            // Start profiling for backtracking search
+            console.time("Backtracking Execution");
+            const result = backtrackingSolve();
+            console.timeEnd("Backtracking Execution");
+    
+            if (result) {
+                displaySolution();
+                document.getElementById("result").textContent = "Crossword solved!";
+                displayWordList();
+            } else {
+                document.getElementById("result").textContent = "No possible solution.";
+            }
+        }
+    }
+    
+    // Helper function to shuffle an array (Fisher-Yates algorithm)
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+    
+    // Shuffle domains to introduce randomness in value order
+    function randomizeDomains() {
+        for (const domain of domains.values()) {
+            shuffleArray(domain);
         }
     }
 
