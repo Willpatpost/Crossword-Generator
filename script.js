@@ -3,8 +3,6 @@
 
     // Constants and configurations
     const DEBUG = false; // Toggle debug messages
-    const RANDOM_SEED = 123;
-    let seed = Math.floor(Math.random() * 1000000); // Randomize seed on each run
 
     // Cached data
     const wordLengthCache = new Map();
@@ -75,18 +73,10 @@
         }
     ];
 
-    // Seeded randomization using Linear Congruential Generator (LCG)
-    function seededRandom() {
-        const a = 1664525;
-        const c = 1013904223;
-        seed = (a * seed + c) % 4294967296;
-        return seed / 4294967296;
-    }
-
     function shuffleWithSeed(array) {
         let m = array.length, t, i;
         while (m) {
-            i = Math.floor(seededRandom() * m--);
+            i = Math.floor(Math.random() * m--); // Use Math.random() directly
             t = array[m];
             array[m] = array[i];
             array[i] = t;
