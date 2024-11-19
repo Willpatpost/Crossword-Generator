@@ -410,47 +410,38 @@
         const queue = [];
         constraints.forEach((neighbors, var1) => neighbors.forEach((_, var2) => queue.push([var1, var2])));
     
+        // Sort variables with smaller domains first in the queue
+        queue.sort((a, b) => domains.get(a[0]).length - domains.get(b[0]).length);
+    
         while (queue.length) {
             const [var1, var2] = queue.shift();
             if (revise(var1, var2)) {
                 if (!domains.get(var1).length) return false;
                 constraints.get(var1).forEach((_, neighbor) => queue.push([neighbor, var1]));
             }
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await new Promise(resolve => setTimeout(resolve, 0)); // Yield to UI
         }
         return true;
     }
 
     // Function to revise domains for consistency
     function revise(var1, var2) {
-        let revised = false;
         const overlaps = constraints.get(var1).get(var2);
-
-        const domainVar1 = domains.get(var1);
-        const domainVar2 = domains.get(var2);
-
         const newDomain = [];
-
-        outerLoop:
-        for (const word1 of domainVar1) {
-            // Check if word1 matches pre-filled letters in var1
-            if (!wordMatchesPreFilledLetters(var1, word1)) {
-                revised = true;
-                continue;
-            }
-
-            for (const word2 of domainVar2) {
-                if (wordsMatch(var1, word1, var2, word2)) {
-                    newDomain.push(word1);
-                    continue outerLoop;
+    
+        for (const word1 of domains.get(var1)) {
+            let hasSupport = false;
+            for (const word2 of domains.get(var2)) {
+                if (overlaps.every(([i, j]) => word1[i] === word2[j])) {
+                    hasSupport = true;
+                    break;
                 }
             }
-            revised = true;
+            if (hasSupport) newDomain.push(word1);
         }
-
-        if (revised) {
-            domains.set(var1, newDomain);
-        }
+    
+        const revised = newDomain.length < domains.get(var1).length;
+        if (revised) domains.set(var1, newDomain);
         return revised;
     }
 
