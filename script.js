@@ -372,36 +372,36 @@
         domains.clear();
         for (const [slot, positions] of slots.entries()) {
             const length = positions.length;
-            let regexPattern = positions.map(([r, c]) => {
-                const content = cellContents.get(`${r},${c}`);
-                return content ? content : '.';
-            }).join('');
+            let regexPattern = positions.map(([r, c]) => cellContents.get(`${r},${c}`) || '.').join('');
             const regex = new RegExp(`^${regexPattern}$`);
-
+    
             const possibleWords = wordLengthCache.get(length) || [];
-            const filteredWords = possibleWords.filter(word => regex.test(word));
-
+            const filteredWords = regexPattern.includes('.') ? possibleWords.filter(word => regex.test(word)) : possibleWords;
+    
             if (filteredWords.length === 0) {
                 console.warn(`Domain for slot ${slot} is empty after setup.`);
             }
-
+    
             domains.set(slot, filteredWords);
         }
-
-        debugLog("Domains after setup:", domains);
     }
 
-    // Function to check if a word matches the pre-filled letters in a slot
+    const prefilledCache = new Map();
+    
     function wordMatchesPreFilledLetters(slot, word) {
+        if (prefilledCache.has(slot + word)) return prefilledCache.get(slot + word);
+    
         const positions = slots.get(slot);
         for (let idx = 0; idx < positions.length; idx++) {
             const [row, col] = positions[idx];
             const key = `${row},${col}`;
             const preFilledLetter = cellContents.get(key);
             if (preFilledLetter && preFilledLetter !== word[idx]) {
+                prefilledCache.set(slot + word, false);
                 return false;
             }
         }
+        prefilledCache.set(slot + word, true);
         return true;
     }
 
@@ -489,12 +489,10 @@
 
     // Least Constraining Value heuristic with domain shuffling for randomization
     function orderDomainValues(variable, assignment) {
-        const domainValues = domains.get(variable).slice();
-        shuffleArray(domainValues); // Randomize order before sorting
-        return domainValues.sort((a, b) => {
+        return domains.get(variable).sort((a, b) => {
             const conflictsA = countConflicts(variable, a, assignment);
             const conflictsB = countConflicts(variable, b, assignment);
-            return conflictsA - conflictsB;
+            return conflictsA - conflictsB; // Least constraining value first
         });
     }
     
