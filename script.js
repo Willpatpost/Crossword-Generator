@@ -85,10 +85,8 @@
     }
 
     // Helper function for logging
-    function debugLog(message, flag = DEBUG, ...optionalParams) {
-        if (flag) {
-            console.log(message, ...optionalParams);
-        }
+    function debugLog(message, ...optionalParams) {
+        if (DEBUG) console.log(message, ...optionalParams);
     }
 
     // Event listeners for buttons
@@ -107,23 +105,21 @@
         try {
             const response = await fetch('Data/Words.txt');
             if (!response.ok) throw new Error("Could not load words file");
-
+    
             const text = await response.text();
             words = text.split('\n').map(word => word.trim().toUpperCase());
-
+    
             if (!words.every(word => /^[A-Z]+$/.test(word))) {
-                throw new Error("File contains invalid words. Ensure all entries are alphabetic.");
+                throw new Error("Invalid words format. Ensure all words are alphabetic.");
             }
-
+    
             cacheWordsByLength();
-            debugLog("Words loaded:", words.length);
         } catch (error) {
             console.error("Error loading words:", error);
-            alert("Error loading words. Please check if Words.txt is available and correctly formatted.");
+            alert("Error loading words. Ensure Words.txt is available and correctly formatted.");
         }
     }
-
-    // Cache words by length to optimize domain setup
+    
     function cacheWordsByLength() {
         wordLengthCache.clear();
         for (const word of words) {
@@ -136,7 +132,6 @@
 
     // Initialize the grid with black cells
     function generateGrid() {
-        // Clear any existing puzzle
         grid = [];
         solution = {};
         slots.clear();
@@ -144,40 +139,39 @@
         domains.clear();
         cellContents.clear();
         memoizedMaxNumber.value = null;
-
+    
         const rows = parseInt(document.getElementById("rows").value);
         const cols = parseInt(document.getElementById("columns").value);
-
+    
         if (isNaN(rows) || isNaN(cols) || rows <= 0 || cols <= 0) {
-            alert("Please enter valid positive numbers for rows and columns.");
+            alert("Enter positive numbers for rows and columns.");
             return;
         }
-
+    
         grid = Array.from({ length: rows }, () => Array(cols).fill("#"));
+        renderGrid();
+    }
+    
+    function renderGrid() {
         const gridContainer = document.getElementById("gridContainer");
         gridContainer.innerHTML = "";
-
-        // Batch DOM updates using DocumentFragment
         const fragment = document.createDocumentFragment();
-
-        for (let r = 0; r < rows; r++) {
+    
+        grid.forEach((row, r) => {
             const rowDiv = document.createElement("div");
             rowDiv.classList.add("grid-row");
-
-            for (let c = 0; c < cols; c++) {
+    
+            row.forEach((cell, c) => {
                 const cellDiv = document.createElement("div");
-                cellDiv.classList.add("grid-cell", "black-cell");
+                cellDiv.classList.add("grid-cell", cell === "#" ? "black-cell" : "white-cell");
                 cellDiv.dataset.row = r;
                 cellDiv.dataset.col = c;
                 cellDiv.addEventListener("click", () => toggleCellOrAddNumber(cellDiv));
                 rowDiv.appendChild(cellDiv);
-            }
+            });
             fragment.appendChild(rowDiv);
-        }
-
+        });
         gridContainer.appendChild(fragment);
-        memoizedMaxNumber.value = null; // Reset memoization
-        debugLog("Grid generated with rows:", rows, "columns:", cols);
     }
 
     // Load a predefined puzzle
@@ -322,100 +316,54 @@
         slots.clear();
         domains.clear();
         cellContents.clear();
-
-        const rows = grid.length;
-        const cols = grid[0].length;
-
-        for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-                const cell = grid[r][c];
-                if (/^[A-Z]$/.test(cell)) {
-                    cellContents.set(`${r},${c}`, cell);
-                } else if (cell !== "#" && cell.trim() !== "") {
-                    cellContents.set(`${r},${c}`, null);
-                }
+    
+        grid.forEach((row, r) => row.forEach((cell, c) => {
+            if (/^\d+$/.test(cell)) {
+                const across = getSlotPositions(r, c, "across");
+                const down = getSlotPositions(r, c, "down");
+    
+                if (across.length >= 2) slots.set(`${cell}ACROSS`, across);
+                if (down.length >= 2) slots.set(`${cell}DOWN`, down);
             }
-        }
-
-        for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-                const cell = grid[r][c];
-                if (/^\d+$/.test(cell)) {
-                    if (c === 0 || grid[r][c - 1] === "#") {
-                        const positions = getSlotPositions(r, c, "across");
-                        if (positions.length >= 2) {
-                            const slotName = `${cell}ACROSS`;
-                            slots.set(slotName, positions);
-                        }
-                    }
-                    if (r === 0 || grid[r - 1][c] === "#") {
-                        const positions = getSlotPositions(r, c, "down");
-                        if (positions.length >= 2) {
-                            const slotName = `${cell}DOWN`;
-                            slots.set(slotName, positions);
-                        }
-                    }
-                }
-            }
-        }
-
-        debugLog("Generated Slots:", slots);
-
+        }));
+    
         generateConstraints();
         setupDomains();
     }
-
-    // Helper function to get slot positions in a direction
+    
     function getSlotPositions(r, c, direction) {
         const positions = [];
-        const rows = grid.length;
-        const cols = grid[0].length;
-
-        while (r < rows && c < cols && grid[r][c] !== "#") {
+        while (grid[r] && grid[r][c] !== "#") {
             positions.push([r, c]);
-            if (direction === "across") {
-                c++;
-            } else {
-                r++;
-            }
+            direction === "across" ? c++ : r++;
         }
-
         return positions;
     }
-
-    // Generate constraints based on slot intersections
+    
     function generateConstraints() {
-        constraints.clear();
         const positionMap = new Map();
-
-        for (const [slot, positions] of slots.entries()) {
+    
+        slots.forEach((positions, slot) => {
             positions.forEach((pos, idx) => {
                 const key = `${pos[0]},${pos[1]}`;
                 if (!positionMap.has(key)) positionMap.set(key, []);
                 positionMap.get(key).push({ slot, idx });
             });
-        }
-
-        for (const overlaps of positionMap.values()) {
-            if (overlaps.length > 1) {
-                for (let i = 0; i < overlaps.length; i++) {
-                    for (let j = i + 1; j < overlaps.length; j++) {
-                        const { slot: slot1, idx: idx1 } = overlaps[i];
-                        const { slot: slot2, idx: idx2 } = overlaps[j];
-
-                        if (!constraints.has(slot1)) constraints.set(slot1, new Map());
-                        if (!constraints.has(slot2)) constraints.set(slot2, new Map());
-
-                        if (!constraints.get(slot1).has(slot2)) constraints.get(slot1).set(slot2, []);
-                        if (!constraints.get(slot2).has(slot1)) constraints.get(slot2).set(slot1, []);
-
-                        constraints.get(slot1).get(slot2).push([idx1, idx2]);
-                        constraints.get(slot2).get(slot1).push([idx2, idx1]);
-                    }
-                }
-            }
-        }
-
+        });
+    
+        positionMap.forEach(overlaps => {
+            overlaps.forEach((o1, i) => overlaps.slice(i + 1).forEach(o2 => {
+                const [slot1, slot2] = [o1.slot, o2.slot];
+                const idx1 = o1.idx, idx2 = o2.idx;
+    
+                if (!constraints.has(slot1)) constraints.set(slot1, new Map());
+                if (!constraints.has(slot2)) constraints.set(slot2, new Map());
+    
+                constraints.get(slot1).set(slot2, (constraints.get(slot1).get(slot2) || []).concat([[idx1, idx2]]));
+                constraints.get(slot2).set(slot1, (constraints.get(slot2).get(slot1) || []).concat([[idx2, idx1]]));
+            }));
+        });
+    
         debugLog("Generated Constraints:", constraints);
     }
 
@@ -459,30 +407,18 @@
 
     // AC-3 Algorithm with asynchronicity for better UI responsiveness
     async function ac3() {
-    const queue = [];
-
-    for (const [var1, neighbors] of constraints.entries()) {
-        for (const var2 of neighbors.keys()) {
-            queue.push([var1, var2]);
-        }
-    }
-
-    // Prioritize variables with smaller domains
-    queue.sort((a, b) => domains.get(a[0]).length - domains.get(b[0]).length);
-
-    while (queue.length) {
-        const [var1, var2] = queue.shift();
-        if (revise(var1, var2)) {
-            if (!domains.get(var1).length) {
-                return false;
+        const queue = [];
+        constraints.forEach((neighbors, var1) => neighbors.forEach((_, var2) => queue.push([var1, var2])));
+    
+        while (queue.length) {
+            const [var1, var2] = queue.shift();
+            if (revise(var1, var2)) {
+                if (!domains.get(var1).length) return false;
+                constraints.get(var1).forEach((_, neighbor) => queue.push([neighbor, var1]));
             }
-            for (const neighbor of constraints.get(var1).keys()) {
-                if (neighbor !== var2) queue.push([neighbor, var1]);
-            }
+            await new Promise(resolve => setTimeout(resolve, 0));
         }
-        await new Promise(resolve => setTimeout(resolve, 0)); // Yield to UI
-    }
-    return true;
+        return true;
     }
 
     // Function to revise domains for consistency
@@ -521,23 +457,17 @@
     // Backtracking Search with MRV and Degree Heuristics
     function backtrackingSolve(assignment = {}) {
         if (Object.keys(assignment).length === slots.size) {
-            solution = { ...assignment }; // Clone the assignment
-            debugLog("Solution found:", solution);
+            solution = { ...assignment };
             return true;
         }
-
+    
         const varToAssign = selectUnassignedVariable(assignment);
-        if (!varToAssign) return false;
-        debugLog("Selecting variable to assign:", varToAssign);
-
         for (const value of orderDomainValues(varToAssign, assignment)) {
-            debugLog(`Trying ${value} for ${varToAssign}`);
             if (isConsistent(varToAssign, value, assignment)) {
                 assignment[varToAssign] = value;
                 const inferences = forwardCheck(varToAssign, value, assignment);
                 if (inferences !== false) {
-                    const result = backtrackingSolve(assignment);
-                    if (result) return result;
+                    if (backtrackingSolve(assignment)) return true;
                 }
                 delete assignment[varToAssign];
                 restoreDomains(inferences);
@@ -739,18 +669,12 @@
 
     // Display the solution on the grid
     function displaySolution() {
-        for (const [slot, word] of Object.entries(solution)) {
-            const positions = slots.get(slot);
-
-            positions.forEach(([row, col], idx) => {
-                const cell = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
-                if (cell) {
-                    cell.textContent = word[idx];
-                    cell.classList.add("solved-cell");
-                }
+        slots.forEach((positions, slot) => {
+            positions.forEach(([r, c], idx) => {
+                const cell = document.querySelector(`.grid-cell[data-row="${r}"][data-col="${c}"]`);
+                if (cell) cell.textContent = solution[slot][idx];
             });
-        }
-        debugLog("Solution displayed on the grid.");
+        });
     }
 
     // Display word list organized by slot number and direction
