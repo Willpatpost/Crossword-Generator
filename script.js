@@ -3,8 +3,8 @@
 
     // Constants and configurations
     const DEBUG = false; // Toggle debug messages
-    const RANDOM_SEED = 123;
-    let seed = RANDOM_SEED;
+    let seed = Date.now(); // Use the current timestamp as the seed
+    console.log("Randomness initialized with Date.now():", Date.now());
 
     // Cached data
     const wordLengthCache = new Map();
@@ -714,12 +714,18 @@
     
     // Helper function to shuffle an array (Fisher-Yates algorithm)
     function shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-    }
+        let m = array.length, t, i;
     
+        while (m) {
+            i = Math.floor(Math.random() * m--); // Directly use Math.random()
+            t = array[m];
+            array[m] = array[i];
+            array[i] = t;
+        }
+    
+        return array;
+    }
+
     // Shuffle domains to introduce randomness in value order
     function randomizeDomains() {
         for (const domain of domains.values()) {
