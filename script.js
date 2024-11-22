@@ -75,25 +75,6 @@
         }
     ];
 
-    // Seeded randomization using Linear Congruential Generator (LCG)
-    function seededRandom() {
-        const a = 1664525;
-        const c = 1013904223;
-        seed = (a * seed + c) % 4294967296;
-        return seed / 4294967296;
-    }
-
-    function shuffleWithSeed(array) {
-        let m = array.length, t, i;
-        while (m) {
-            i = Math.floor(seededRandom() * m--);
-            t = array[m];
-            array[m] = array[i];
-            array[i] = t;
-        }
-        return array;
-    }
-
     // Helper function for logging
     function debugLog(message, flag = DEBUG, ...optionalParams) {
         if (flag) {
