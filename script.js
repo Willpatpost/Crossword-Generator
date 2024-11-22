@@ -3,10 +3,6 @@
 
     // Constants and configurations
     const DEBUG = false; // Toggle debug messages
-    let seed = Date.now(); // Use the current timestamp as the seed
-    console.log("Randomness initialized with Date.now():", Date.now());
-
-    // Cached data
     const wordLengthCache = new Map();
     const memoizedMaxNumber = {};
 
@@ -20,6 +16,8 @@
     let cellContents = new Map();
     let isNumberEntryMode = false;
     let currentNumber = 1;
+    let seed = Date.now(); // Use the current timestamp as the seed
+    console.log("Randomness initialized with Date.now():", Date.now());
 
     // Predefined puzzles
     const predefinedPuzzles = [
