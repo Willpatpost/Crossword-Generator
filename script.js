@@ -350,7 +350,7 @@
             }
         }
 
-        debugLog("Generated Slots:", slots);
+        //debugLog("Generated Slots:", slots);
 
         generateConstraints();
         setupDomains();
@@ -407,7 +407,7 @@
             }
         }
 
-        debugLog("Generated Constraints:", constraints);
+        //debugLog("Generated Constraints:", constraints);
     }
 
     // Set up domains for each slot using regex for faster filtering
@@ -431,7 +431,7 @@
             domains.set(slot, filteredWords);
         }
 
-        debugLog("Domains after setup:", domains);
+        //debugLog("Domains after setup:", domains);
     }
 
     // Function to check if a word matches the pre-filled letters in a slot
