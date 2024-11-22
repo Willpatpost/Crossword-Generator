@@ -535,12 +535,11 @@
             debugLog("Solution found:", solution);
             return true;
         }
-    
+
         const varToAssign = selectUnassignedVariable(assignment);
         if (!varToAssign) return false;
-    
         debugLog("Selecting variable to assign:", varToAssign);
-    
+
         for (const value of orderDomainValues(varToAssign, assignment)) {
             debugLog(`Trying ${value} for ${varToAssign}`);
             if (isConsistent(varToAssign, value, assignment)) {
@@ -572,7 +571,7 @@
             if (degreeA !== degreeB) return degreeB - degreeA;
     
             // Introduce slight randomness for variables with identical MRV and degree
-            return seededRandom() - 0.5;
+            return Math.random() - 0.5;
         });
         return unassignedVars[0];
     }
@@ -580,15 +579,13 @@
     // Least Constraining Value heuristic with domain shuffling for randomization
     function orderDomainValues(variable, assignment) {
         const domainValues = domains.get(variable).slice();
-        return domainValues
-            .sort((a, b) => {
-                const conflictsA = countConflicts(variable, a, assignment);
-                const conflictsB = countConflicts(variable, b, assignment);
-                return conflictsA - conflictsB; // Least constraining first
-            })
-            .sort(() => seededRandom() - 0.5); // Add randomness to equally constraining values
+        return domainValues.sort((a, b) => {
+            const conflictsA = countConflicts(variable, a, assignment);
+            const conflictsB = countConflicts(variable, b, assignment);
+            return conflictsA - conflictsB; // Least constraining first
+        });
     }
-
+    
     function countConflicts(variable, value, assignment) {
         let conflicts = 0;
         const neighbors = constraints.get(variable);
@@ -737,7 +734,7 @@
     // Helper function to shuffle an array (Fisher-Yates algorithm)
     function shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(seededRandom() * (i + 1));
+            const j = Math.floor(Math.random() * (i + 1));
             [array[i], array[j]] = [array[j], array[i]];
         }
     }
