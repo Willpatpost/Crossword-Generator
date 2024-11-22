@@ -535,11 +535,12 @@
             debugLog("Solution found:", solution);
             return true;
         }
-
-        const varToAssign = ignedVariable(assignment);
+    
+        const varToAssign = selectUnassignedVariable(assignment);
         if (!varToAssign) return false;
+    
         debugLog("Selecting variable to assign:", varToAssign);
-
+    
         for (const value of orderDomainValues(varToAssign, assignment)) {
             debugLog(`Trying ${value} for ${varToAssign}`);
             if (isConsistent(varToAssign, value, assignment)) {
