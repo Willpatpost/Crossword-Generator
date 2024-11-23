@@ -6,30 +6,36 @@ import re
 import time
 
 class CrosswordSolver(tk.Tk):
+    """
+    Main application class for the Crossword Solver GUI.
+    """
     def __init__(self):
+        """
+        Initialize the crossword solver application.
+        """
         super().__init__()
         self.title("Custom Crossword Generator")
         self.configure(bg="#f0f2f5")
 
         # Constants and configurations
         self.DEBUG = False  # Toggle debug messages
-        self.word_length_cache = {}
-        self.memoized_max_number = {'value': None}
-        self.is_number_entry_mode = False
-        self.current_number = 1
+        self.word_length_cache = {}      # Cache for words by length
+        self.memoized_max_number = {'value': None}  # Cache for max slot number
+        self.is_number_entry_mode = False  # Flag for number entry mode
+        self.current_number = 1  # Current slot number
         self.seed = int(time.time())
         random.seed(self.seed)
-        self.is_solving = False
+        self.is_solving = False  # Flag to prevent multiple solves at once
 
         # Data structures
-        self.grid = []
-        self.words = []
-        self.slots = {}
-        self.constraints = {}
-        self.solution = {}
-        self.domains = {}
-        self.cell_contents = {}
-        self.cells = {}
+        self.grid = []              # The crossword grid
+        self.words = []             # List of words from the dictionary
+        self.slots = {}             # Dictionary of slots with positions
+        self.constraints = {}       # Constraints between slots
+        self.solution = {}          # Final solution mapping slots to words
+        self.domains = {}           # Possible words for each slot
+        self.cell_contents = {}     # Pre-filled letters in the grid
+        self.cells = {}             # Mapping of grid positions to GUI cells
 
         # Predefined puzzles
         self.predefined_puzzles = [
@@ -92,10 +98,16 @@ class CrosswordSolver(tk.Tk):
         self.after(0, self.load_words)
 
     def debug_log(self, message, *args):
+        """
+        Print debug messages if DEBUG is True.
+        """
         if self.DEBUG:
             print(message, *args)
 
     def create_widgets(self):
+        """
+        Create and configure the GUI components.
+        """
         # Header
         header = tk.Label(self, text="Custom Crossword Generator",
                           font=("Roboto", 22, "bold"), bg="#f0f2f5", fg="#222")
@@ -192,9 +204,25 @@ class CrosswordSolver(tk.Tk):
                                                 relief="raised", bd=2)
         self.solve_crossword_button.pack()
 
+        # Status and Word List Sections
+        status_and_word_list_frame = tk.Frame(self, bg="#f0f2f5")
+        status_and_word_list_frame.pack(pady=10)
+
+        # Status Section
+        status_frame = tk.Frame(status_and_word_list_frame, bg="#f0f2f5")
+        status_frame.pack(side="left", padx=10)
+
+        status_label = tk.Label(status_frame, text="Status",
+                                font=("Roboto", 14, "bold"), bg="#f0f2f5", fg="#333")
+        status_label.pack()
+
+        self.status_display = tk.Text(status_frame, height=5, width=30, state="disabled",
+                                      bg="#f8f9fa", fg="#222", font=("Roboto", 12))
+        self.status_display.pack(pady=5)
+
         # Word List Section
-        word_list_frame = tk.Frame(self, bg="#f0f2f5")
-        word_list_frame.pack(pady=10)
+        word_list_frame = tk.Frame(status_and_word_list_frame, bg="#f0f2f5")
+        word_list_frame.pack(side="left", padx=10)
 
         word_list_label = tk.Label(word_list_frame, text="Word List",
                                    font=("Roboto", 14, "bold"), bg="#f0f2f5", fg="#333")
@@ -210,6 +238,9 @@ class CrosswordSolver(tk.Tk):
         footer.pack(pady=10)
 
     def load_words(self):
+        """
+        Load words from 'Words.txt' and cache them by length.
+        """
         try:
             with open('Words.txt', 'r') as f:
                 self.words = [word.strip().upper() for word in f if word.strip()]
@@ -221,6 +252,9 @@ class CrosswordSolver(tk.Tk):
             messagebox.showerror("Error", f"Error loading words: {e}")
 
     def cache_words_by_length(self):
+        """
+        Cache words by their length for efficient domain setup.
+        """
         self.word_length_cache.clear()
         for word in self.words:
             length = len(word)
@@ -230,6 +264,9 @@ class CrosswordSolver(tk.Tk):
         self.debug_log("Word length cache created.")
 
     def generate_grid(self):
+        """
+        Generate a blank grid based on user-selected dimensions.
+        """
         # Clear any existing puzzle
         self.grid = []
         self.solution.clear()
@@ -246,12 +283,14 @@ class CrosswordSolver(tk.Tk):
             messagebox.showerror("Error", "Please enter valid positive numbers for rows and columns.")
             return
 
+        # Initialize the grid with black cells
         self.grid = [["#" for _ in range(cols)] for _ in range(rows)]
         self.cells = {}
         self.grid_container.destroy()
         self.grid_container = tk.Frame(self.grid_frame, bg="#ffffff", bd=3, relief="solid")
         self.grid_container.pack(pady=10)
 
+        # Create GUI cells
         for r in range(rows):
             for c in range(cols):
                 cell = tk.Label(self.grid_container, text="", width=2, height=1, bg="#333",
@@ -265,6 +304,9 @@ class CrosswordSolver(tk.Tk):
         self.debug_log("Grid generated with rows:", rows, "columns:", cols)
 
     def load_predefined_puzzle(self, puzzle_name):
+        """
+        Load a predefined puzzle by name.
+        """
         puzzle = next((p for p in self.predefined_puzzles if p['name'] == puzzle_name), None)
         if not puzzle:
             messagebox.showerror("Error", f"Puzzle {puzzle_name} not found.")
@@ -282,12 +324,14 @@ class CrosswordSolver(tk.Tk):
         rows = len(puzzle['grid'])
         cols = len(puzzle['grid'][0])
 
-        self.grid = [row[:] for row in puzzle['grid']]  # Deep copy to avoid modifying the original
+        # Deep copy to avoid modifying the original puzzle
+        self.grid = [row[:] for row in puzzle['grid']]
         self.cells = {}
         self.grid_container.destroy()
         self.grid_container = tk.Frame(self.grid_frame, bg="#ffffff", bd=3, relief="solid")
         self.grid_container.pack(pady=10)
 
+        # Create GUI cells with appropriate content
         for r in range(rows):
             for c in range(cols):
                 cell_value = self.grid[r][c]
@@ -312,11 +356,15 @@ class CrosswordSolver(tk.Tk):
         self.debug_log(f"Loaded predefined puzzle: {puzzle_name}")
 
     def toggle_cell_or_add_number(self, event):
+        """
+        Handle cell clicks for toggling black/white cells or adding numbers/letters.
+        """
         cell = event.widget
         row = cell.row
         col = cell.col
 
         if self.is_number_entry_mode:
+            # Number Entry Mode: add slot numbers
             if cell.cget("bg") != "#333" and not cell.cget("text"):
                 cell.config(text=str(self.current_number), fg="#000")
                 self.grid[row][col] = str(self.current_number)
@@ -327,6 +375,7 @@ class CrosswordSolver(tk.Tk):
             else:
                 messagebox.showwarning("Warning", "Number can only be placed on empty white cells.")
         else:
+            # Regular Mode: toggle cell or add letter
             if cell.cget("bg") == "#333":  # Black cell
                 cell.config(bg="#f8f9fa", fg="#444")
                 self.grid[row][col] = " "
@@ -344,6 +393,9 @@ class CrosswordSolver(tk.Tk):
                     self.grid[row][col] = "#"
 
     def start_number_entry_mode(self):
+        """
+        Activate number entry mode for adding slot numbers.
+        """
         self.current_number = self.get_max_number_on_grid() + 1
         self.is_number_entry_mode = True
         self.start_number_entry_button.pack_forget()
@@ -352,6 +404,9 @@ class CrosswordSolver(tk.Tk):
         self.debug_log("Number entry mode started. Current number:", self.current_number)
 
     def stop_number_entry_mode(self):
+        """
+        Deactivate number entry mode.
+        """
         self.is_number_entry_mode = False
         self.stop_number_entry_button.pack_forget()
         self.start_number_entry_button.pack(side="left", padx=5)
@@ -359,6 +414,9 @@ class CrosswordSolver(tk.Tk):
         self.debug_log("Number entry mode stopped.")
 
     def get_max_number_on_grid(self):
+        """
+        Get the maximum slot number currently on the grid.
+        """
         if self.memoized_max_number['value'] is not None:
             return self.memoized_max_number['value']
         max_number = 0
@@ -374,6 +432,9 @@ class CrosswordSolver(tk.Tk):
         return max_number
 
     def solve_crossword(self):
+        """
+        Start the crossword solving process in a separate thread.
+        """
         if self.is_solving:
             messagebox.showwarning("Solver Busy", "A puzzle is already being solved. Please wait.")
             return
@@ -382,12 +443,13 @@ class CrosswordSolver(tk.Tk):
         threading.Thread(target=self.solve_crossword_thread).start()
 
     def solve_crossword_thread(self):
+        """
+        Solve the crossword puzzle using AC-3 and backtracking algorithms.
+        """
         try:
             # Shuffle domains for randomness
             self.randomize_domains()
-            self.result_display.config(state="normal")
-            self.result_display.insert(tk.END, "Setting up constraints...\n")
-            self.result_display.config(state="disabled")
+            self.update_status("Setting up constraints...")
             self.generate_slots()
 
             if not self.slots:
@@ -396,9 +458,7 @@ class CrosswordSolver(tk.Tk):
                 self.is_solving = False
                 return
 
-            self.result_display.config(state="normal")
-            self.result_display.insert(tk.END, "Running AC-3 algorithm...\n")
-            self.result_display.config(state="disabled")
+            self.update_status("Running AC-3 algorithm...")
 
             ac3_result = self.ac3()
 
@@ -415,38 +475,41 @@ class CrosswordSolver(tk.Tk):
                 result = self.backtracking_solve()
                 if result:
                     self.display_solution()
-                    self.result_display.config(state="normal")
-                    self.result_display.insert(tk.END, "Crossword solved!\n")
-                    self.result_display.config(state="disabled")
+                    self.update_status("Crossword solved!")
                     self.display_word_list()
                 else:
-                    self.result_display.config(state="normal")
-                    self.result_display.insert(tk.END, "No possible solution.\n")
-                    self.result_display.config(state="disabled")
+                    self.update_status("No possible solution.")
             else:
-                self.result_display.config(state="normal")
-                self.result_display.insert(tk.END, "Starting backtracking search...\n")
-                self.result_display.config(state="disabled")
+                self.update_status("Starting backtracking search...")
 
                 result = self.backtracking_solve()
 
                 if result:
                     self.display_solution()
-                    self.result_display.config(state="normal")
-                    self.result_display.insert(tk.END, "Crossword solved!\n")
-                    self.result_display.config(state="disabled")
+                    self.update_status("Crossword solved!")
                     self.display_word_list()
                 else:
-                    self.result_display.config(state="normal")
-                    self.result_display.insert(tk.END, "No possible solution.\n")
-                    self.result_display.config(state="disabled")
+                    self.update_status("No possible solution.")
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
         finally:
             self.solve_crossword_button.config(state="normal")
             self.is_solving = False
 
+    def update_status(self, message):
+        """
+        Update the status display with a new message.
+        """
+        self.status_display.config(state="normal")
+        self.status_display.insert(tk.END, message + "\n")
+        self.status_display.see(tk.END)
+        self.status_display.config(state="disabled")
+        self.debug_log(message)
+
     def generate_slots(self):
+        """
+        Identify all slots in the grid and generate constraints.
+        """
         self.slots.clear()
         self.domains.clear()
         self.cell_contents.clear()
@@ -481,6 +544,9 @@ class CrosswordSolver(tk.Tk):
         self.setup_domains()
 
     def get_slot_positions(self, r, c, direction):
+        """
+        Get the positions of cells in a slot starting from (r, c).
+        """
         positions = []
         rows = len(self.grid)
         cols = len(self.grid[0])
@@ -495,6 +561,9 @@ class CrosswordSolver(tk.Tk):
         return positions
 
     def generate_constraints(self):
+        """
+        Generate constraints between overlapping slots.
+        """
         self.constraints.clear()
         position_map = {}
 
@@ -528,6 +597,9 @@ class CrosswordSolver(tk.Tk):
                         self.constraints[slot2][slot1].append((idx2, idx1))
 
     def setup_domains(self):
+        """
+        Set up the domains for each slot based on possible words and pre-filled letters.
+        """
         self.domains.clear()
         for slot, positions in self.slots.items():
             length = len(positions)
@@ -546,6 +618,9 @@ class CrosswordSolver(tk.Tk):
             self.domains[slot] = filtered_words
 
     def word_matches_pre_filled_letters(self, slot, word):
+        """
+        Check if a word matches the pre-filled letters in a slot.
+        """
         positions = self.slots[slot]
         for idx in range(len(positions)):
             row, col = positions[idx]
@@ -556,6 +631,9 @@ class CrosswordSolver(tk.Tk):
         return True
 
     def ac3(self):
+        """
+        Perform the AC-3 algorithm to enforce arc consistency.
+        """
         queue = []
 
         for var1, neighbors in self.constraints.items():
@@ -576,6 +654,9 @@ class CrosswordSolver(tk.Tk):
         return True
 
     def revise(self, var1, var2):
+        """
+        Revise the domain of var1 to ensure consistency with var2.
+        """
         revised = False
         overlaps = self.constraints[var1][var2]
 
@@ -602,6 +683,9 @@ class CrosswordSolver(tk.Tk):
         return revised
 
     def words_match(self, var1, word1, var2, word2):
+        """
+        Check if two words are consistent at their overlapping positions.
+        """
         overlaps = self.constraints[var1][var2]
         for idx1, idx2 in overlaps:
             if word1[idx1] != word2[idx2]:
@@ -609,6 +693,9 @@ class CrosswordSolver(tk.Tk):
         return True
 
     def backtracking_solve(self, assignment=None):
+        """
+        Recursive backtracking search to find a solution.
+        """
         if assignment is None:
             assignment = {}
         if len(assignment) == len(self.slots):
@@ -634,6 +721,9 @@ class CrosswordSolver(tk.Tk):
         return False
 
     def select_unassigned_variable(self, assignment):
+        """
+        Select the next variable to assign using MRV and degree heuristics.
+        """
         unassigned_vars = [v for v in self.domains if v not in assignment]
         if not unassigned_vars:
             return None
@@ -647,6 +737,9 @@ class CrosswordSolver(tk.Tk):
         return unassigned_vars[0]
 
     def order_domain_values(self, variable, assignment):
+        """
+        Order the domain values using the least constraining value heuristic.
+        """
         def count_conflicts(value):
             conflicts = 0
             neighbors = self.constraints.get(variable)
@@ -658,6 +751,9 @@ class CrosswordSolver(tk.Tk):
                     for neighbor_value in self.domains[neighbor]:
                         if not self.words_match(variable, value, neighbor, neighbor_value):
                             conflicts += 1
+                # Optimization: early exit if conflicts exceed threshold
+                # if conflicts > some_threshold:
+                #     break
             return conflicts
 
         domain_values = self.domains[variable][:]
@@ -666,6 +762,9 @@ class CrosswordSolver(tk.Tk):
         return domain_values
 
     def is_consistent(self, variable, value, assignment):
+        """
+        Check if assigning a value to a variable is consistent with the current assignment.
+        """
         if not self.word_matches_pre_filled_letters(variable, value):
             return False
 
@@ -685,6 +784,9 @@ class CrosswordSolver(tk.Tk):
         return True
 
     def forward_check(self, variable, value, assignment):
+        """
+        Perform forward checking after assigning a value to a variable.
+        """
         inferences = {}
         neighbors = self.constraints.get(variable)
         if not neighbors:
@@ -703,16 +805,25 @@ class CrosswordSolver(tk.Tk):
         return inferences
 
     def restore_domains(self, inferences):
+        """
+        Restore domains to their previous state after backtracking.
+        """
         if not inferences:
             return
         for variable, domain in inferences.items():
             self.domains[variable] = domain
 
     def randomize_domains(self):
+        """
+        Shuffle domain values to introduce randomness.
+        """
         for domain in self.domains.values():
             random.shuffle(domain)
 
     def display_solution(self):
+        """
+        Display the solution on the GUI grid.
+        """
         for slot, word in self.solution.items():
             positions = self.slots[slot]
             for idx, (row, col) in enumerate(positions):
@@ -722,6 +833,9 @@ class CrosswordSolver(tk.Tk):
         self.debug_log("Solution displayed on the grid.")
 
     def display_word_list(self):
+        """
+        Display the list of words used in the solution.
+        """
         across_words = []
         down_words = []
 
