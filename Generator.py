@@ -6,6 +6,11 @@ import time
 import numpy as np
 from collections import Counter
 import threading
+import logging
+
+# Logging configuration
+logging.basicConfig(filename="debug.log", level=logging.DEBUG,
+                    format="%(asctime)s - %(levelname)s - %(message)s")
 
 class CrosswordSolver(tk.Tk):
     """
@@ -13,33 +18,49 @@ class CrosswordSolver(tk.Tk):
     """
 
     def __init__(self):
-        """
-        Initialize the crossword solver application.
-        """
         super().__init__()
         self.title("Custom Crossword Generator")
         self.configure(bg="#f0f2f5")
 
         # Constants and configurations
-        self.DEBUG = False  # Toggle debug messages
-        self.word_length_cache = {}      # Cache for words by length
-        self.is_number_entry_mode = False  # Flag for number entry mode
-        self.is_solving = False  # Flag to prevent multiple solves at once
-        self.recursive_calls = 0  # Count recursive calls for performance metrics
+        self.DEBUG = True  # Toggle debug messages
+        self.word_length_cache = {}  # Cache for words by length
+        self.is_number_entry_mode = False  # Number entry mode flag
+        self.is_letter_entry_mode = False  # Letter entry mode flag
+        self.is_drag_mode = False  # Drag mode flag
+        self.is_solving = False  # Prevent concurrent solving
+        self.recursive_calls = 0  # Count recursive calls
         self.performance_data = {}  # Store performance metrics
 
         # Data structures
-        self.grid = np.array([])              # The crossword grid
-        self.words = []             # List of words from the dictionary
-        self.slots = {}             # Dictionary of slots with positions
-        self.constraints = {}       # Constraints between slots
-        self.solution = {}          # Final solution mapping slots to words
-        self.domains = {}           # Possible words for each slot
-        self.cell_contents = {}     # Pre-filled letters in the grid
-        self.cells = {}             # Mapping of grid positions to GUI cells
+        self.grid = np.array([])  # The crossword grid
+        self.words = []  # Word list
+        self.slots = {}  # Slots with positions
+        self.constraints = {}  # Constraints between slots
+        self.solution = {}  # Final solution mapping slots to words
+        self.domains = {}  # Possible words for each slot
+        self.cell_contents = {}  # Pre-filled letters in the grid
+        self.cells = {}  # GUI cell mapping
 
         # Predefined puzzles
-        self.predefined_puzzles = [
+        self.predefined_puzzles = self.initialize_puzzles()
+
+        # Initialize GUI components
+        self.create_widgets()
+
+        # Load words
+        self.after(0, self.load_words)
+
+    # ------------------------- Initialization Methods -------------------------
+
+    def initialize_puzzles(self):
+        """
+        Define predefined puzzles for the application.
+
+        Returns:
+            list: Predefined puzzle configurations.
+        """
+        return [
             {
                 "name": "Easy",
                 "grid": [
@@ -92,186 +113,259 @@ class CrosswordSolver(tk.Tk):
             }
         ]
 
-        # Initialize GUI components
-        self.create_widgets()
-
-        # Load words
-        self.after(0, self.load_words)
-
     def debug_log(self, message, *args):
         """
-        Print debug messages if DEBUG is True.
+        Log debug messages if DEBUG is True.
 
         Args:
             message (str): The message to log.
             *args: Additional arguments to format into the message.
         """
         if self.DEBUG:
-            with open('debug.log', 'a') as log_file:
-                log_file.write(message + ' ' + ' '.join(str(arg) for arg in args) + '\n')
+            formatted_message = message.format(*args)
+            logging.debug(formatted_message)
+
+    # ------------------------- UI Methods -------------------------
 
     def create_widgets(self):
         """
         Create and configure the GUI components.
         """
-        # Main Frame
         main_frame = tk.Frame(self, bg="#f0f2f5")
         main_frame.pack(fill="both", expand=True)
 
         # Header
-        header = tk.Label(main_frame, text="Custom Crossword Generator",
-                          font=("Arial", 22, "bold"), bg="#f0f2f5", fg="#222")
-        header.pack(pady=10)
+        tk.Label(main_frame, text="Custom Crossword Generator",
+                font=("Arial", 22, "bold"), bg="#f0f2f5", fg="#222").pack(pady=10)
+
+        # Content Frame
+        content_frame = tk.Frame(main_frame, bg="#f0f2f5")
+        content_frame.pack(fill="both", expand=True)
+        content_frame.grid_rowconfigure(1, weight=1)
+        content_frame.grid_columnconfigure(0, weight=1)
 
         # Top Frame for settings and controls
-        top_frame = tk.Frame(main_frame, bg="#f0f2f5")
-        top_frame.pack(pady=10, fill="x")
+        top_frame = tk.Frame(content_frame, bg="#f0f2f5")
+        top_frame.grid(row=0, column=0, sticky="nsew")
+        top_frame.grid_columnconfigure(0, weight=1)
 
         # Settings Section
         settings_frame = tk.Frame(top_frame, bg="#f0f2f5")
-        settings_frame.pack(side="left", padx=10)
+        settings_frame.pack(pady=10)
 
-        settings_label = tk.Label(settings_frame, text="Select Grid Size",
-                                  font=("Arial", 16), bg="#f0f2f5", fg="#333")
-        settings_label.grid(row=0, column=0, columnspan=4, pady=5)
+        tk.Label(settings_frame, text="Select Grid Size",
+                font=("Arial", 16), bg="#f0f2f5", fg="#333").grid(row=0, column=0, columnspan=4, pady=5)
 
         tk.Label(settings_frame, text="Rows:", bg="#f0f2f5", fg="#333",
-                 font=("Arial", 12)).grid(row=1, column=0, padx=5)
+                font=("Arial", 12)).grid(row=1, column=0, padx=5)
         self.rows_var = tk.IntVar(value=10)
-        rows_options = list(range(1, 21))
-        self.rows_menu = tk.OptionMenu(settings_frame, self.rows_var, *rows_options)
-        self.rows_menu.grid(row=1, column=1, padx=5)
+        rows_options = list(range(5, 21))
+        tk.OptionMenu(settings_frame, self.rows_var, *rows_options).grid(row=1, column=1, padx=5)
 
         tk.Label(settings_frame, text="Columns:", bg="#f0f2f5", fg="#333",
-                 font=("Arial", 12)).grid(row=1, column=2, padx=5)
+                font=("Arial", 12)).grid(row=1, column=2, padx=5)
         self.columns_var = tk.IntVar(value=10)
-        self.columns_menu = tk.OptionMenu(settings_frame, self.columns_var, *rows_options)
-        self.columns_menu.grid(row=1, column=3, padx=5)
+        tk.OptionMenu(settings_frame, self.columns_var, *rows_options).grid(row=1, column=3, padx=5)
 
-        self.generate_grid_button = tk.Button(settings_frame, text="Generate Grid",
-                                              command=self.generate_grid, bg="#0069d9",
-                                              fg="#ffffff", font=("Arial", 10, "bold"),
-                                              relief="raised", bd=2)
-        self.generate_grid_button.grid(row=2, column=0, columnspan=4, pady=10)
+        tk.Button(settings_frame, text="Generate Grid", command=self.generate_grid,
+                bg="#0069d9", fg="#ffffff", font=("arial", 12, "bold")).grid(row=2, column=0, columnspan=4, pady=10)
 
         # Predefined Puzzles Section
         puzzles_frame = tk.Frame(top_frame, bg="#f0f2f5")
-        puzzles_frame.pack(side="left", padx=10)
+        puzzles_frame.pack(pady=10)
 
-        puzzles_label = tk.Label(puzzles_frame, text="Load Puzzle",
-                                 font=("Arial", 16), bg="#f0f2f5", fg="#333")
-        puzzles_label.pack()
+        tk.Label(puzzles_frame, text="Load Puzzle",
+                font=("Arial", 16), bg="#f0f2f5", fg="#333").pack()
 
-        self.load_easy_puzzle = tk.Button(puzzles_frame, text="Load Easy Puzzle",
-                                          command=lambda: self.load_predefined_puzzle("Easy"), bg="#17a2b8",
-                                          fg="#ffffff", font=("Arial", 10, "bold"),
-                                          relief="raised", bd=2)
-        self.load_easy_puzzle.pack(side="left", padx=5, pady=5)
+        tk.Button(puzzles_frame, text="Load Easy Puzzle",
+                command=lambda: self.load_predefined_puzzle("Easy"), bg="#17a2b8",
+                fg="#ffffff", font=("arial", 12, "bold")).pack(side="left", padx=5, pady=5)
 
-        self.load_medium_puzzle = tk.Button(puzzles_frame, text="Load Medium Puzzle",
-                                            command=lambda: self.load_predefined_puzzle("Medium"), bg="#17a2b8",
-                                            fg="#ffffff", font=("Arial", 10, "bold"),
-                                            relief="raised", bd=2)
-        self.load_medium_puzzle.pack(side="left", padx=5, pady=5)
+        tk.Button(puzzles_frame, text="Load Medium Puzzle",
+                command=lambda: self.load_predefined_puzzle("Medium"), bg="#17a2b8",
+                fg="#ffffff", font=("arial", 12, "bold")).pack(side="left", padx=5, pady=5)
 
-        self.load_hard_puzzle = tk.Button(puzzles_frame, text="Load Hard Puzzle",
-                                          command=lambda: self.load_predefined_puzzle("Hard"), bg="#17a2b8",
-                                          fg="#ffffff", font=("Arial", 10, "bold"),
-                                          relief="raised", bd=2)
-        self.load_hard_puzzle.pack(side="left", padx=5, pady=5)
+        tk.Button(puzzles_frame, text="Load Hard Puzzle",
+                command=lambda: self.load_predefined_puzzle("Hard"), bg="#17a2b8",
+                fg="#ffffff", font=("arial", 12, "bold")).pack(side="left", padx=5, pady=5)
+
+        # Mode Controls
+        mode_frame = tk.Frame(content_frame, bg="#f0f2f5")
+        mode_frame.grid(row=2, column=0, pady=10)
 
         # Number Entry Controls
-        number_entry_frame = tk.Frame(top_frame, bg="#f0f2f5")
-        number_entry_frame.pack(side="left", padx=10)
-
-        self.start_number_entry_button = tk.Button(number_entry_frame, text="Enter Number Mode",
-                                                   command=self.start_number_entry_mode, bg="#0069d9",
-                                                   fg="#ffffff", font=("Arial", 10, "bold"),
-                                                   relief="raised", bd=2)
+        self.start_number_entry_button = tk.Button(
+            mode_frame,
+            text="Number Entry Mode",
+            command=self.start_number_entry_mode,
+            bg="#0069d9",
+            fg="#ffffff",
+            font=("arial", 12, "bold")
+        )
         self.start_number_entry_button.pack(side="left", padx=5)
 
-        self.stop_number_entry_button = tk.Button(number_entry_frame, text="Stop Number Mode",
-                                                  command=self.stop_number_entry_mode, bg="#dc3545",
-                                                  fg="#ffffff", font=("Arial", 10, "bold"),
-                                                  relief="raised", bd=2)
-        self.stop_number_entry_button.pack(side="left", padx=5)
-        self.stop_number_entry_button.pack_forget()  # Hide initially
+        # Letter Entry Controls
+        self.start_letter_entry_button = tk.Button(
+            mode_frame,
+            text="Letter Entry Mode",
+            command=self.start_letter_entry_mode,
+            bg="#0069d9",
+            fg="#ffffff",
+            font=("arial", 12, "bold")
+        )
+        self.start_letter_entry_button.pack(side="left", padx=5)
+
+        # Drag Mode Controls
+        self.start_drag_mode_button = tk.Button(
+            mode_frame,
+            text="Drag Mode",
+            command=self.start_drag_mode,
+            bg="#0069d9",
+            fg="#ffffff",
+            font=("arial", 12, "bold")
+        )
+        self.start_drag_mode_button.pack(side="left", padx=5)
 
         # Middle Frame for grid and side panels
-        middle_frame = tk.Frame(main_frame, bg="#f0f2f5")
-        middle_frame.pack(fill="both", expand=True, padx=10)
+        middle_frame = tk.Frame(content_frame, bg="#f0f2f5")
+        middle_frame.grid(row=1, column=0, sticky="nsew")
+        middle_frame.grid_columnconfigure(0, weight=1)
+        middle_frame.grid_columnconfigure(1, weight=1)
+        middle_frame.grid_columnconfigure(2, weight=1)
+        content_frame.grid_rowconfigure(1, weight=1)
 
         # Left Frame for Status
         status_frame = tk.Frame(middle_frame, bg="#f0f2f5")
-        status_frame.pack(side="left", padx=10, fill="y")
+        status_frame.grid(row=0, column=0, sticky="nsew")
+        status_frame.grid_rowconfigure(0, weight=1)
+        status_frame.grid_columnconfigure(0, weight=1)
 
-        status_label = tk.Label(status_frame, text="Status",
-                                font=("Arial", 14, "bold"), bg="#f0f2f5", fg="#333")
-        status_label.pack()
+        tk.Label(status_frame, text="Status",
+                font=("Arial", 14, "bold"), bg="#f0f2f5", fg="#333").pack()
 
-        self.status_display = tk.Text(status_frame, height=20, width=30, state="disabled",
-                                      bg="#f8f9fa", fg="#222", font=("Arial", 12))
-        self.status_display.pack(pady=5)
+        status_scrollbar = tk.Scrollbar(status_frame)
+        status_scrollbar.pack(side="right", fill="y")
+
+        self.status_display = tk.Text(status_frame, wrap="word", yscrollcommand=status_scrollbar.set,
+                                    bg="#f8f9fa", fg="#222", font=("arial", 12), height=10, width=25)
+        self.status_display.pack(fill="both", expand=True, pady=5)
+        self.status_display.config(state="disabled")
+        status_scrollbar.config(command=self.status_display.yview)
 
         # Grid Frame
         self.grid_frame = tk.Frame(middle_frame, bg="#f0f2f5")
-        self.grid_frame.pack(side="left", padx=10)
+        self.grid_frame.grid(row=0, column=1, sticky="nsew")
+        self.grid_frame.grid_rowconfigure(0, weight=1)
+        self.grid_frame.grid_columnconfigure(0, weight=1)
 
-        grid_label = tk.Label(self.grid_frame, text="Crossword Grid",
-                              font=("Arial", 16), bg="#f0f2f5", fg="#333")
-        grid_label.pack()
+        tk.Label(self.grid_frame, text="Crossword Grid",
+                font=("Arial", 16), bg="#f0f2f5", fg="#333").pack()
 
-        self.grid_container = tk.Frame(self.grid_frame, bg="#ffffff", bd=3, relief="solid")
-        self.grid_container.pack(pady=10)
+        self.grid_container = tk.Frame(
+            self.grid_frame, bg="#ffffff", bd=3, relief="solid")
+        self.grid_container.pack(expand=True, pady=10, padx=10)
 
         # Right Frame for Word Lists
         word_list_frame = tk.Frame(middle_frame, bg="#f0f2f5")
-        word_list_frame.pack(side="left", padx=10, fill="y")
+        word_list_frame.grid(row=0, column=2, sticky="nsew")
+        word_list_frame.grid_rowconfigure(0, weight=1)
+        word_list_frame.grid_columnconfigure(0, weight=1)
 
         # Across Words Frame
         across_frame = tk.Frame(word_list_frame, bg="#f0f2f5")
-        across_frame.pack(padx=5)
+        across_frame.pack(fill="both", expand=True)
 
-        across_label = tk.Label(across_frame, text="Across",
-                                font=("Arial", 14, "bold"), bg="#f0f2f5", fg="#333")
-        across_label.pack()
+        tk.Label(across_frame, text="Across",
+                font=("Arial", 14, "bold"), bg="#f0f2f5", fg="#333").pack()
 
-        self.across_display = tk.Text(across_frame, height=10, width=30, state="disabled",
-                                      bg="#f8f9fa", fg="#222", font=("Arial", 12))
-        self.across_display.pack(pady=5)
+        across_scrollbar = tk.Scrollbar(across_frame)
+        across_scrollbar.pack(side="right", fill="y")
+
+        self.across_display = tk.Text(across_frame, wrap="word", yscrollcommand=across_scrollbar.set,
+                                    bg="#f8f9fa", fg="#222", font=("arial", 12), height=10, width=25)
+        self.across_display.pack(fill="both", expand=True, pady=5)
+        self.across_display.config(state="disabled")
+        across_scrollbar.config(command=self.across_display.yview)
 
         # Down Words Frame
         down_frame = tk.Frame(word_list_frame, bg="#f0f2f5")
-        down_frame.pack(padx=5)
+        down_frame.pack(fill="both", expand=True)
 
-        down_label = tk.Label(down_frame, text="Down",
-                              font=("Arial", 14, "bold"), bg="#f0f2f5", fg="#333")
-        down_label.pack()
+        tk.Label(down_frame, text="Down",
+                font=("Arial", 14, "bold"), bg="#f0f2f5", fg="#333").pack()
 
-        self.down_display = tk.Text(down_frame, height=10, width=30, state="disabled",
-                                    bg="#f8f9fa", fg="#222", font=("Arial", 12))
-        self.down_display.pack(pady=5)
+        down_scrollbar = tk.Scrollbar(down_frame)
+        down_scrollbar.pack(side="right", fill="y")
+
+        self.down_display = tk.Text(down_frame, wrap="word", yscrollcommand=down_scrollbar.set,
+                                    bg="#f8f9fa", fg="#222", font=("arial", 12), height=10, width=25)
+        self.down_display.pack(fill="both", expand=True, pady=5)
+        self.down_display.config(state="disabled")
+        down_scrollbar.config(command=self.down_display.yview)
+
+        # Adjust the frames to have the same height
+        status_frame.update_idletasks()
+        word_list_frame.update_idletasks()
+        desired_height = status_frame.winfo_height()
+        word_list_frame.config(height=desired_height)
+
+        # Show mode
+        self.mode_label = tk.Label(
+            content_frame,
+            text="Mode: Default",
+            font=("Arial", 12),
+            bg="#f0f2f5",
+            fg="#555"
+        )
+        self.mode_label.grid(row=3, column=0, pady=5)
 
         # Controls Section
-        controls_frame = tk.Frame(main_frame, bg="#f0f2f5")
-        controls_frame.pack(pady=10)
+        controls_frame = tk.Frame(content_frame, bg="#f0f2f5")
+        controls_frame.grid(row=4, column=0, pady=10)
 
         self.solve_crossword_button = tk.Button(controls_frame, text="Solve Crossword",
                                                 command=self.solve_crossword, bg="#28a745",
-                                                fg="#ffffff", font=("Arial", 10, "bold"),
-                                                relief="raised", bd=2)
+                                                fg="#ffffff", font=("arial", 12, "bold"))
         self.solve_crossword_button.pack(side="left", padx=5)
-
-        self.set_seed_button = tk.Button(controls_frame, text="Set Seed",
-                                         command=self.set_seed, bg="#ffc107",
-                                         fg="#ffffff", font=("Arial", 10, "bold"),
-                                         relief="raised", bd=2)
-        self.set_seed_button.pack(side="left", padx=5)
+        self.solve_crossword_button.bind("<Enter>", lambda e: self.show_tooltip(
+            e, "Start solving the crossword"))
 
         # Footer
-        footer = tk.Label(main_frame, text="© 2024 Crossword Generator",
-                          font=("Arial", 10), bg="#f0f2f5", fg="#555")
-        footer.pack(pady=10)
+        tk.Label(main_frame, text="© William Poston Crossword Generator",
+                font=("arial", 12), bg="#f0f2f5", fg="#555").pack(pady=10)
+
+    def show_tooltip(self, event, text):
+        """
+        Display a tooltip when hovering over a widget.
+
+        Args:
+            event: The Tkinter event object.
+            text (str): The tooltip text.
+        """
+        x = event.widget.winfo_rootx() + 20
+        y = event.widget.winfo_rooty() + 20
+        self.tooltip = tk.Toplevel()
+        self.tooltip.overrideredirect(True)
+        self.tooltip.geometry(f"+{x}+{y}")
+        label = tk.Label(self.tooltip, text=text, bg="yellow",
+                         fg="black", font=("arial", 12))
+        label.pack()
+
+        def hide_tooltip(e):
+            self.tooltip.destroy()
+
+        event.widget.bind("<Leave>", hide_tooltip)
+
+    def update_status(self, message, clear=False):
+        self.status_display.config(state="normal")
+        if clear:
+            self.status_display.delete(1.0, tk.END)
+        self.status_display.insert(tk.END, message + "\n")
+        self.status_display.see(tk.END)
+        self.status_display.config(state="disabled")
+        self.debug_log(message)
+
+    # ------------------------- Word Loading and Caching -------------------------
 
     def load_words(self):
         """
@@ -279,16 +373,20 @@ class CrosswordSolver(tk.Tk):
         """
         try:
             with open('Words.txt', 'r') as f:
-                self.words = [word.strip().upper() for word in f if word.strip()]
-            if not all(re.match("^[A-Z]+$", word) for word in self.words):
-                raise ValueError("File contains invalid words. Ensure all entries are alphabetic.")
+                self.words = [word.strip().upper()
+                              for word in f if word.strip()]
+            if not all(word.isalpha() for word in self.words):
+                raise ValueError(
+                    "File contains invalid words. Ensure all entries are alphabetic.")
             self.cache_words_by_length()
             self.calculate_letter_frequencies()
-            self.debug_log("Words loaded:", len(self.words))
+            self.debug_log("Words loaded: {}", len(self.words))
         except FileNotFoundError:
             # Fallback word list
-            self.words = ["LASER", "SAILS", "SHEET", "STEER", "HEEL", "HIKE", "KEEL", "KNOT"]
-            messagebox.showwarning("Warning", "Words.txt not found. Using fallback word list.")
+            self.words = ["LASER", "SAILS", "SHEET", "STEER",
+                          "HEEL", "HIKE", "KEEL", "KNOT"]
+            messagebox.showwarning(
+                "Warning", "Words.txt not found. Using fallback word list.")
             self.debug_log("Words.txt not found. Using fallback word list.")
             self.cache_words_by_length()
             self.calculate_letter_frequencies()
@@ -302,9 +400,7 @@ class CrosswordSolver(tk.Tk):
         self.word_length_cache.clear()
         for word in self.words:
             length = len(word)
-            if length not in self.word_length_cache:
-                self.word_length_cache[length] = []
-            self.word_length_cache[length].append(word)
+            self.word_length_cache.setdefault(length, []).append(word)
         self.debug_log("Word length cache created.")
 
     def calculate_letter_frequencies(self):
@@ -314,22 +410,26 @@ class CrosswordSolver(tk.Tk):
         all_letters = "".join(self.words)
         self.letter_frequencies = Counter(all_letters)
 
+    # ------------------------- Grid Management Methods -------------------------
+
     def generate_grid(self):
         """
-        Generate a blank grid based on user-selected dimensions using numpy.
+        Generate a blank grid based on user-selected dimensions.
         """
         rows = self.rows_var.get()
         cols = self.columns_var.get()
 
         if rows <= 0 or cols <= 0:
-            messagebox.showerror("Error", "Please enter valid positive numbers for rows and columns.")
+            messagebox.showerror(
+                "Error", "Please enter valid positive numbers for rows and columns.")
             return
 
         # Clear any existing puzzle
         self.grid = np.full((rows, cols), "#", dtype=str)
         self.cells = {}
         self.grid_container.destroy()
-        self.grid_container = tk.Frame(self.grid_frame, bg="#ffffff", bd=3, relief="solid")
+        self.grid_container = tk.Frame(
+            self.grid_frame, bg="#ffffff", bd=3, relief="solid")
         self.grid_container.pack(pady=10)
 
         # Create GUI cells
@@ -338,12 +438,12 @@ class CrosswordSolver(tk.Tk):
                 cell = tk.Label(self.grid_container, text="", width=2, height=1, bg="#333",
                                 fg="#333", bd=1, relief="solid", font=("Arial", 12, "bold"))
                 cell.grid(row=r, column=c)
-                cell.bind("<Button-1>", self.toggle_cell_or_add_number)
+                cell.bind("<Button-1>", self.cell_clicked)
                 cell.row = r
                 cell.col = c
                 self.cells[(r, c)] = cell
 
-        self.debug_log("Grid generated with rows:", rows, "columns:", cols)
+        self.debug_log("Grid generated with rows: {}, columns: {}", rows, cols)
 
     def load_predefined_puzzle(self, puzzle_name):
         """
@@ -352,7 +452,8 @@ class CrosswordSolver(tk.Tk):
         Args:
             puzzle_name (str): The name of the puzzle to load.
         """
-        puzzle = next((p for p in self.predefined_puzzles if p['name'] == puzzle_name), None)
+        puzzle = next(
+            (p for p in self.predefined_puzzles if p['name'] == puzzle_name), None)
         if not puzzle:
             messagebox.showerror("Error", f"Puzzle {puzzle_name} not found.")
             return
@@ -372,7 +473,8 @@ class CrosswordSolver(tk.Tk):
         self.grid = np.array([row[:] for row in puzzle['grid']], dtype=str)
         self.cells = {}
         self.grid_container.destroy()
-        self.grid_container = tk.Frame(self.grid_frame, bg="#ffffff", bd=3, relief="solid")
+        self.grid_container = tk.Frame(
+            self.grid_frame, bg="#ffffff", bd=3, relief="solid")
         self.grid_container.pack(pady=10)
 
         # Create GUI cells with appropriate content
@@ -392,68 +494,175 @@ class CrosswordSolver(tk.Tk):
                     cell.config(bg="#f8f9fa", fg="#444")
 
                 cell.grid(row=r, column=c)
-                cell.bind("<Button-1>", self.toggle_cell_or_add_number)
+                cell.bind("<Button-1>", self.cell_clicked)
                 cell.row = r
                 cell.col = c
                 self.cells[(r, c)] = cell
 
-        self.debug_log(f"Loaded predefined puzzle: {puzzle_name}")
+        self.debug_log("Loaded predefined puzzle: {}", puzzle_name)
 
-    def toggle_cell_or_add_number(self, event):
-        """
-        Handle cell clicks for toggling black/white cells or adding numbers/letters.
-
-        Args:
-            event: The Tkinter event object.
-        """
+    def cell_clicked(self, event):
         cell = event.widget
-        row = cell.row
-        col = cell.col
+        row, col = cell.row, cell.col
+
+        if cell.cget("bg") == "#333":  # Blacked-out cells
+            messagebox.showwarning("Warning", "This cell is blacked out and cannot be modified.")
+            return
 
         if self.is_number_entry_mode:
-            # Number Entry Mode: add slot numbers
-            if cell.cget("bg") != "#333":
-                if not cell.cget("text").isdigit():
-                    self.add_number_to_cell(row, col)
-                else:
-                    # Remove the number
-                    self.remove_number_from_cell(row, col)
+            # Number Entry Mode: Automatically assign the next available number
+            if self.grid[row][col].isdigit():
+                # If the cell already has a number, remove it
+                self.remove_number_from_cell(row, col)
             else:
-                messagebox.showwarning("Warning", "Number cannot be placed on black cells.")
+                self.add_number_to_cell(row, col)
+            return
+
+        if self.is_letter_entry_mode:
+            # Letter Entry Mode: Allow only single alphabetic characters
+            letter = simpledialog.askstring("Input", "Enter a single letter (A-Z):")
+            if letter and letter.isalpha() and len(letter) == 1:
+                self.update_cell(row, col, value=letter.upper(), fg="#000", bg="#f8f9fa")
+                self.grid[row][col] = letter.upper()
+            else:
+                messagebox.showwarning("Invalid Input", "Please enter a single letter (A-Z).")
+            return
+
+        if self.is_drag_mode:
+            # Drag Mode is active, so clicking does not toggle cells
+            return
+
+        # Default Mode: Toggle between black and white
+        if cell.cget("bg") != "#333":
+            self.update_cell(row, col, value="", bg="#333", fg="#333")
+            self.grid[row][col] = "#"
+            self.update_numbers_after_removal(row, col)
         else:
-            # Regular Mode: toggle cell or add letter
-            if cell.cget("bg") == "#333":  # Black cell
-                cell.config(bg="#f8f9fa", fg="#444", text="")
-                self.grid[row][col] = " "
+            self.update_cell(row, col, value="", bg="#f8f9fa", fg="#444")
+            self.grid[row][col] = " "
+
+    def start_drag_mode(self):
+        if self.is_number_entry_mode:
+            self.start_number_entry_mode()
+        if self.is_letter_entry_mode:
+            self.start_letter_entry_mode()
+        if self.is_drag_mode:
+            self.is_drag_mode = False
+            self.mode_label.config(text="Mode: Default")
+            self.update_status("Drag Mode Deactivated.")
+            self.debug_log("Drag mode stopped.")
+
+            # Unbind drag events
+            for cell in self.cells.values():
+                cell.unbind("<ButtonPress-1>")
+                cell.unbind("<B1-Motion>")
+                cell.unbind("<ButtonRelease-1>")
+
+                # Rebind cell click
+                cell.bind("<Button-1>", self.cell_clicked)
+
+            # Update button appearance
+            self.start_drag_mode_button.config(text="Drag Mode", bg="#0069d9")
+        else:
+            self.is_drag_mode = True
+            self.mode_label.config(text="Mode: Drag")
+            self.update_status("Drag Mode Activated.")
+            self.debug_log("Drag mode started.")
+
+            # Bind drag events
+            for cell in self.cells.values():
+                cell.bind("<ButtonPress-1>", self.start_drag)
+                cell.bind("<B1-Motion>", self.on_drag)
+                cell.bind("<ButtonRelease-1>", self.stop_drag)
+
+            # Update button appearance
+            self.start_drag_mode_button.config(text="Exit Drag Mode", bg="#dc3545")
+
+    def stop_drag_mode(self):
+        self.is_drag_mode = False
+        self.mode_label.config(text="Mode: Default")
+        self.update_status("Drag Mode Deactivated.")
+        self.debug_log("Drag mode stopped.")
+
+        # Unbind drag events
+        for cell in self.cells.values():
+            cell.unbind("<ButtonPress-1>")
+            cell.unbind("<B1-Motion>")
+            cell.unbind("<ButtonRelease-1>")
+
+            # Rebind cell click
+            cell.bind("<Button-1>", self.cell_clicked)
+
+        # Update button appearance
+        self.start_drag_mode_button.config(text="Drag Mode", bg="#0069d9")
+
+    def start_drag(self, event):
+        if not self.is_drag_mode:
+            return
+        cell = event.widget
+        row, col = cell.row, cell.col
+        self.is_dragging = True
+        if cell.cget("bg") == "#333":
+            self.toggle_to_black = False  # We're turning cells white
+        else:
+            self.toggle_to_black = True  # We're turning cells black
+        self.toggle_cell(row, col)
+
+    def on_drag(self, event):
+        if not self.is_dragging or not self.is_drag_mode:
+            return
+        x = self.grid_container.winfo_pointerx() - self.grid_container.winfo_rootx()
+        y = self.grid_container.winfo_pointery() - self.grid_container.winfo_rooty()
+        widget = event.widget.winfo_containing(event.x_root, event.y_root)
+        if widget in self.cells.values():
+            cell = widget
+            row = cell.row
+            col = cell.col
+            self.toggle_cell(row, col)
+
+    def stop_drag(self, event):
+        self.is_dragging = False
+
+    def toggle_cell(self, row, col):
+        cell = self.cells.get((row, col))
+        if cell:
+            if self.toggle_to_black and cell.cget("bg") != "#333":
+                self.update_cell(row, col, value="", bg="#333", fg="#333")
+                self.grid[row][col] = "#"
                 self.update_numbers_after_removal(row, col)
-            else:
-                letter = simpledialog.askstring("Input", "Enter a letter (or leave blank to toggle back to black):")
-                if letter:
-                    letter = letter.upper()
-                    if re.match("^[A-Z]$", letter):
-                        cell.config(text=letter, fg="#000")
-                        self.grid[row][col] = letter
-                    else:
-                        messagebox.showwarning("Invalid Input", "Please enter a single letter A-Z.")
-                else:
-                    cell.config(bg="#333", fg="#333", text="")
-                    self.grid[row][col] = "#"
-                    self.update_numbers_after_removal(row, col)
+            elif not self.toggle_to_black and cell.cget("bg") == "#333":
+                self.update_cell(row, col, value="", bg="#f8f9fa", fg="#444")
+                self.grid[row][col] = " "
+
+    def update_cell(self, row, col, value=None, bg=None, fg=None):
+        """
+        Update the content and appearance of a cell.
+
+        Args:
+            row (int): Row index.
+            col (int): Column index.
+            value (str): The text to set in the cell.
+            bg (str): Background color.
+            fg (str): Foreground color.
+        """
+        cell = self.cells.get((row, col))
+        if cell:
+            if value is not None:
+                cell.config(text=value)
+            if bg is not None:
+                cell.config(bg=bg)
+            if fg is not None:
+                cell.config(fg=fg)
 
     def add_number_to_cell(self, row, col):
         """
-        Add a number to a cell and update subsequent numbers.
-
-        Args:
-            row (int): The row index of the cell.
-            col (int): The column index of the cell.
+        Add a number to a cell automatically based on numbering logic.
         """
-        # Find the correct number to assign
         number_positions = self.get_number_positions()
         new_number = self.get_new_number(row, col, number_positions)
-        self.grid[row][col] = str(new_number)
-        self.cells[(row, col)].config(text=str(new_number), fg="#000", bg="#f8f9fa")
         self.update_numbers_after_insertion(row, col, new_number)
+        self.update_cell(row, col, value=str(new_number), fg="#000", bg="#f8f9fa")
+        self.grid[row][col] = str(new_number)
 
     def get_number_positions(self):
         """
@@ -507,7 +716,7 @@ class CrosswordSolver(tk.Tk):
                     current_number = int(cell_value)
                     if current_number >= new_number and (r, c) != (row, col):
                         self.grid[r][c] = str(current_number + 1)
-                        self.cells[(r, c)].config(text=str(current_number + 1))
+                        self.update_cell(r, c, value=str(current_number + 1))
 
     def remove_number_from_cell(self, row, col):
         """
@@ -519,7 +728,7 @@ class CrosswordSolver(tk.Tk):
         """
         removed_number = int(self.grid[row][col])
         self.grid[row][col] = " "
-        self.cells[(row, col)].config(text="", fg="#444")
+        self.update_cell(row, col, value="", fg="#444")
         for r in range(self.grid.shape[0]):
             for c in range(self.grid.shape[1]):
                 cell_value = self.grid[r][c]
@@ -527,7 +736,7 @@ class CrosswordSolver(tk.Tk):
                     current_number = int(cell_value)
                     if current_number > removed_number:
                         self.grid[r][c] = str(current_number - 1)
-                        self.cells[(r, c)].config(text=str(current_number - 1))
+                        self.update_cell(r, c, value=str(current_number - 1))
 
     def update_numbers_after_removal(self, row, col):
         """
@@ -541,31 +750,54 @@ class CrosswordSolver(tk.Tk):
             self.remove_number_from_cell(row, col)
 
     def start_number_entry_mode(self):
-        """
-        Activate number entry mode for adding slot numbers.
-        """
-        self.is_number_entry_mode = True
-        self.start_number_entry_button.pack_forget()
-        self.stop_number_entry_button.pack(side="left", padx=5)
-        messagebox.showinfo("Number Entry", "Number Entry Mode Activated.")
-        self.debug_log("Number entry mode started.")
+        if self.is_number_entry_mode:
+            # Deactivate number entry mode
+            self.is_number_entry_mode = False
+            self.mode_label.config(text="Mode: Default")
+            self.update_status("Number Entry Mode Deactivated.")
+            self.debug_log("Number entry mode stopped.")
+            self.start_number_entry_button.config(text="Number Entry Mode", bg="#0069d9")
+        else:
+            # Activate number entry mode
+            if self.is_letter_entry_mode:
+                self.start_letter_entry_mode()  # Toggle off letter entry mode
+            if self.is_drag_mode:
+                self.start_drag_mode()  # Toggle off drag mode
+            self.is_number_entry_mode = True
+            self.mode_label.config(text="Mode: Number Entry")
+            self.update_status("Number Entry Mode Activated.")
+            self.debug_log("Number entry mode started.")
+            self.start_number_entry_button.config(text="Exit Number Entry Mode", bg="#dc3545")
 
-    def stop_number_entry_mode(self):
-        """
-        Deactivate number entry mode.
-        """
-        self.is_number_entry_mode = False
-        self.stop_number_entry_button.pack_forget()
-        self.start_number_entry_button.pack(side="left", padx=5)
-        messagebox.showinfo("Number Entry", "Number Entry Mode Deactivated.")
-        self.debug_log("Number entry mode stopped.")
+    def start_letter_entry_mode(self):
+        if self.is_letter_entry_mode:
+            # Deactivate letter entry mode
+            self.is_letter_entry_mode = False
+            self.mode_label.config(text="Mode: Default")
+            self.update_status("Letter Entry Mode Deactivated.")
+            self.debug_log("Letter entry mode stopped.")
+            self.start_letter_entry_button.config(text="Letter Entry Mode", bg="#0069d9")
+        else:
+            # Activate letter entry mode
+            if self.is_number_entry_mode:
+                self.start_number_entry_mode()  # Toggle off number entry mode
+            if self.is_drag_mode:
+                self.start_drag_mode()  # Toggle off drag mode
+            self.is_letter_entry_mode = True
+            self.mode_label.config(text="Mode: Letter Entry")
+            self.update_status("Letter Entry Mode Activated.")
+            self.debug_log("Letter entry mode started.")
+            self.start_letter_entry_button.config(text="Exit Letter Entry Mode", bg="#dc3545")
+
+    # ------------------------- Solving Methods -------------------------
 
     def solve_crossword(self):
         """
         Start the crossword solving process in a separate thread.
         """
         if self.is_solving:
-            messagebox.showwarning("Solver Busy", "A puzzle is already being solved. Please wait.")
+            messagebox.showwarning(
+                "Solver Busy", "A puzzle is already being solved. Please wait.")
             return
         self.is_solving = True
         self.solve_crossword_button.config(state="disabled")
@@ -589,7 +821,8 @@ class CrosswordSolver(tk.Tk):
 
             self.generate_slots()
             if not self.slots:
-                messagebox.showwarning("Warning", "No numbered slots found to solve.")
+                messagebox.showwarning(
+                    "Warning", "No numbered slots found to solve.")
                 self.is_solving = False
                 self.solve_crossword_button.config(state="normal")
                 return
@@ -599,10 +832,12 @@ class CrosswordSolver(tk.Tk):
 
             ac3_result = self.ac3()
 
-            has_empty_domain = any(len(domain) == 0 for domain in self.domains.values())
+            has_empty_domain = any(
+                len(domain) == 0 for domain in self.domains.values())
 
             if not ac3_result or has_empty_domain:
-                self.update_status("AC-3 failed, attempting backtracking...")
+                self.update_status(
+                    "AC-3 failed or domains wiped out. Attempting backtracking...")
             else:
                 self.update_status("Starting backtracking search...")
 
@@ -625,12 +860,14 @@ class CrosswordSolver(tk.Tk):
                 }
                 self.display_solution()
                 self.display_word_list()
-                self.update_status(f"Total solving time: {total_time:.2f} seconds")
+                self.update_status(
+                    f"Total solving time: {total_time:.2f} seconds")
                 self.log_performance_metrics()
             else:
                 self.update_status("No possible solution found.")
         except Exception as e:
-            messagebox.showerror("Error", f"An error occurred during solving: {e}")
+            messagebox.showerror(
+                "Error", f"An error occurred during solving: {e}")
         finally:
             self.solve_crossword_button.config(state="normal")
             self.is_solving = False
@@ -643,32 +880,18 @@ class CrosswordSolver(tk.Tk):
             bool: True if the grid is valid, False otherwise.
         """
         if not self.grid.size:
-            messagebox.showwarning("Warning", "The grid is empty. Please generate or load a grid.")
+            messagebox.showwarning(
+                "Warning", "The grid is empty. Please generate or load a grid.")
             return False
 
         # Check for sufficient slots
         self.generate_slots()
         if not self.slots:
-            messagebox.showwarning("Warning", "No valid slots found in the grid.")
+            messagebox.showwarning(
+                "Warning", "No valid slots found in the grid.")
             return False
 
         return True
-
-    def update_status(self, message, clear=False):
-        """
-        Update the status display with a new message.
-
-        Args:
-            message (str): The status message to display.
-            clear (bool): Whether to clear the existing status messages.
-        """
-        self.status_display.config(state="normal")
-        if clear:
-            self.status_display.delete(1.0, tk.END)
-        self.status_display.insert(tk.END, message + "\n")
-        self.status_display.see(tk.END)
-        self.status_display.config(state="disabled")
-        self.debug_log(message)
 
     def generate_slots(self):
         """
@@ -684,16 +907,17 @@ class CrosswordSolver(tk.Tk):
         for r in range(rows):
             for c in range(cols):
                 cell = self.grid[r][c]
-                if re.match("^[A-Z]$", cell):
-                    self.cell_contents[f"{r},{c}"] = cell
+                key = f"{r},{c}"
+                if cell.isalpha():
+                    self.cell_contents[key] = cell
                 elif cell != "#" and cell.strip() != "":
-                    self.cell_contents[f"{r},{c}"] = None
+                    self.cell_contents[key] = None
 
         # Identify slots
         for r in range(rows):
             for c in range(cols):
                 cell = self.grid[r][c]
-                if re.match("^\d+$", cell):
+                if cell.isdigit():
                     if c == 0 or self.grid[r][c - 1] == "#":
                         positions = self.get_slot_positions(r, c, "across")
                         if len(positions) >= 2:
@@ -742,9 +966,7 @@ class CrosswordSolver(tk.Tk):
         for slot, positions in self.slots.items():
             for idx, pos in enumerate(positions):
                 key = f"{pos[0]},{pos[1]}"
-                if key not in position_map:
-                    position_map[key] = []
-                position_map[key].append({'slot': slot, 'idx': idx})
+                position_map.setdefault(key, []).append({'slot': slot, 'idx': idx})
 
         for overlaps in position_map.values():
             if len(overlaps) > 1:
@@ -755,18 +977,8 @@ class CrosswordSolver(tk.Tk):
                         slot2 = overlaps[j]['slot']
                         idx2 = overlaps[j]['idx']
 
-                        if slot1 not in self.constraints:
-                            self.constraints[slot1] = {}
-                        if slot2 not in self.constraints:
-                            self.constraints[slot2] = {}
-
-                        if slot2 not in self.constraints[slot1]:
-                            self.constraints[slot1][slot2] = []
-                        if slot1 not in self.constraints[slot2]:
-                            self.constraints[slot2][slot1] = []
-
-                        self.constraints[slot1][slot2].append((idx1, idx2))
-                        self.constraints[slot2][slot1].append((idx2, idx1))
+                        self.constraints.setdefault(slot1, {}).setdefault(slot2, []).append((idx1, idx2))
+                        self.constraints.setdefault(slot2, {}).setdefault(slot1, []).append((idx2, idx1))
 
     def setup_domains(self):
         """
@@ -797,8 +1009,7 @@ class CrosswordSolver(tk.Tk):
             bool: True if the word matches pre-filled letters, False otherwise.
         """
         positions = self.slots[slot]
-        for idx in range(len(positions)):
-            row, col = positions[idx]
+        for idx, (row, col) in enumerate(positions):
             key = f"{row},{col}"
             pre_filled_letter = self.cell_contents.get(key)
             if pre_filled_letter and pre_filled_letter != word[idx]:
@@ -916,27 +1127,44 @@ class CrosswordSolver(tk.Tk):
     def select_unassigned_variable(self, assignment):
         """
         Select the next unassigned variable using MRV and degree heuristics, with random tie-breaking.
+
+        Args:
+            assignment (dict): Current variable assignments.
+
+        Returns:
+            str: The selected variable.
         """
         unassigned_vars = [v for v in self.domains if v not in assignment]
         if not unassigned_vars:
             return None
 
-        # Use MRV (minimum domain size) and degree (most constraints), with random tie-breaking
+        # Use MRV (minimum domain size) and degree (most constraints)
         min_size = min(len(self.domains[var]) for var in unassigned_vars)
         candidates = [var for var in unassigned_vars if len(self.domains[var]) == min_size]
 
-        # If there's a tie, select randomly
+        # If there's a tie, select the variable with the most constraints (degree heuristic)
+        max_degree = max(len(self.constraints.get(var, {})) for var in candidates)
+        candidates = [var for var in candidates if len(self.constraints.get(var, {})) == max_degree]
+
+        # If still tied, select randomly
         return random.choice(candidates)
 
     def order_domain_values(self, variable, assignment):
         """
         Order the domain values for a variable using the Least Constraining Value heuristic.
+
+        Args:
+            variable (str): The variable to order values for.
+            assignment (dict): Current variable assignments.
+
+        Returns:
+            list: Ordered list of domain values.
         """
         def value_score(value):
             return sum(self.letter_frequencies[char] for char in value)
 
         # Order by heuristic but shuffle to ensure randomness
-        values = sorted(self.domains[variable], key=lambda val: (value_score(val), random.random()))
+        values = sorted(self.domains[variable], key=lambda val: (value_score(val)))
         random.shuffle(values)  # Shuffle the sorted list for additional randomness
         return values
 
@@ -1024,6 +1252,15 @@ class CrosswordSolver(tk.Tk):
             random.shuffle(domain)  # Shuffle every domain
         self.debug_log("Domains randomized.")
 
+    # ------------------------- Solution Display Methods -------------------------
+
+    def timed_execution(self, func, *args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        self.update_status(f"{func.__name__} finished in {end_time - start_time:.2f} seconds")
+        return result
+
     def display_solution(self):
         """
         Display the solution on the GUI grid.
@@ -1033,7 +1270,7 @@ class CrosswordSolver(tk.Tk):
             for idx, (row, col) in enumerate(positions):
                 cell = self.cells.get((row, col))
                 if cell:
-                    cell.config(text=word[idx], fg="#155724", bg="#d1e7dd")
+                    self.update_cell(row, col, value=word[idx], fg="#155724", bg="#d1e7dd")
         self.debug_log("Solution displayed on the grid.")
 
     def display_word_list(self):
@@ -1054,26 +1291,18 @@ class CrosswordSolver(tk.Tk):
                     down_words.append(entry)
 
         # Update across words display
+        self.across_display.config(state="normal")
+        self.across_display.delete(1.0, tk.END)
         if across_words:
-            self.across_display.config(state="normal")
-            self.across_display.delete(1.0, tk.END)
             self.across_display.insert(tk.END, "\n".join(across_words))
-            self.across_display.config(state="disabled")
-        else:
-            self.across_display.config(state="normal")
-            self.across_display.delete(1.0, tk.END)
-            self.across_display.config(state="disabled")
+        self.across_display.config(state="disabled")
 
         # Update down words display
+        self.down_display.config(state="normal")
+        self.down_display.delete(1.0, tk.END)
         if down_words:
-            self.down_display.config(state="normal")
-            self.down_display.delete(1.0, tk.END)
             self.down_display.insert(tk.END, "\n".join(down_words))
-            self.down_display.config(state="disabled")
-        else:
-            self.down_display.config(state="normal")
-            self.down_display.delete(1.0, tk.END)
-            self.down_display.config(state="disabled")
+        self.down_display.config(state="disabled")
 
     def log_performance_metrics(self):
         """
@@ -1082,21 +1311,10 @@ class CrosswordSolver(tk.Tk):
         for method, data in self.performance_data.items():
             time_taken = data['time']
             calls = data['calls']
-            self.update_status(f"{method} - Time: {time_taken:.4f}s, Recursive Calls: {calls}")
-            self.debug_log(f"{method} - Time: {time_taken:.4f}s, Recursive Calls: {calls}")
-
-    def set_seed(self):
-        """
-        Prompt the user to enter a seed value and set the fixed seed.
-        """
-        seed_value = simpledialog.askinteger("Set Seed", "Enter seed value (integer):")
-        if seed_value is not None:
-            self.set_fixed_seed(seed_value)
-            messagebox.showinfo("Seed Set", f"Seed value set to {seed_value}")
-        else:
-            # If user cancels, reset to random behavior
-            self.set_fixed_seed(None)
-            messagebox.showinfo("Seed Cleared", "Random seed will be used.")
+            self.update_status(
+                f"{method} - Time: {time_taken:.4f}s, Recursive Calls: {calls}")
+            self.debug_log(
+                f"{method} - Time: {time_taken:.4f}s, Recursive Calls: {calls}")
 
     def display_domain_sizes(self):
         """
@@ -1106,6 +1324,8 @@ class CrosswordSolver(tk.Tk):
         for slot in sorted(self.domains.keys(), key=lambda s: int(re.match(r'\d+', s).group())):
             domain_size = len(self.domains[slot])
             self.update_status(f"Domain for {slot} has {domain_size} options.")
+
+    # ------------------------- Run Application -------------------------
 
 # Run main
 if __name__ == "__main__":
