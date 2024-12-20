@@ -24,6 +24,14 @@ h1 {
     font-weight: 600;
 }
 
+/* Mode label styling */
+#modeLabel {
+    font-size: 1.2em;
+    color: #555;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
 /* Settings container styling */
 #settings {
     margin-bottom: 20px;
