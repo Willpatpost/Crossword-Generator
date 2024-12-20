@@ -1,10 +1,7 @@
 (() => {
-    // This JavaScript version aims to replicate the behavior and logic of the Python Tkinter version
-    // as closely as possible. It includes multiple modes (default, number entry, letter entry, drag),
-    // predefined puzzles, AC-3 + backtracking solver, performance metrics, and domain displays.
 
-    // ------------------------- Configuration & Global Variables -------------------------
-    const DEBUG = true; // Toggle debug messages
+     ------------------------- Configuration & Global Variables -------------------------
+    const DEBUG = true;  Toggle debug messages
     let isNumberEntryMode = false;
     let isLetterEntryMode = false;
     let isDragMode = false;
@@ -502,7 +499,7 @@
         }
     }
 
-    // ------------------------- Slot & Constraint Generation -------------------------
+     ------------------------- Slot & Constraint Generation -------------------------
     function generateSlots() {
         slots.clear();
         domains.clear();
@@ -619,7 +616,7 @@
         return true;
     }
 
-    // ------------------------- AC-3 Algorithm -------------------------
+     ------------------------- AC-3 Algorithm -------------------------
     async function ac3() {
         const queue = [];
         for (const [var1, neighbors] of constraints.entries()) {
@@ -638,7 +635,7 @@
                     if (neighbor !== var2) queue.push([neighbor, var1]);
                 }
             }
-            await new Promise(res => setTimeout(res, 0)); // yield to UI
+            await new Promise(res => setTimeout(res, 0));  yield to UI
         }
         return true;
     }
@@ -678,7 +675,7 @@
         return true;
     }
 
-    // ------------------------- Backtracking Search -------------------------
+     ------------------------- Backtracking Search -------------------------
     function backtrackingSolve(assignment = {}, cache = {}) {
         if (Object.keys(assignment).length === slots.size) {
             solution = { ...assignment };
@@ -717,7 +714,7 @@
         const unassigned = Array.from(domains.keys()).filter(v => !(v in assignment));
         if (unassigned.length === 0) return null;
 
-        // MRV
+         MRV
         let minSize = Infinity;
         let candidates = [];
         for (const v of unassigned) {
@@ -730,7 +727,7 @@
             }
         }
 
-        // Degree heuristic
+         Degree heuristic
         let maxDegree = -1;
         let degreeCandidates = [];
         for (const v of candidates) {
@@ -743,7 +740,7 @@
             }
         }
 
-        // If tied, choose randomly
+         If tied, choose randomly
         if (degreeCandidates.length > 1) {
             return degreeCandidates[Math.floor(Math.random() * degreeCandidates.length)];
         }
@@ -753,9 +750,9 @@
 
     function orderDomainValues(variable, assignment) {
         const values = domains.get(variable).slice();
-        // Use letter frequency heuristic (least constraining)
+         Use letter frequency heuristic (least constraining)
         values.sort((a, b) => valueScore(a) - valueScore(b));
-        // Shuffle for randomness
+         Shuffle for randomness
         shuffleArray(values);
         return values;
     }
@@ -818,7 +815,7 @@
         }
     }
 
-    // ------------------------- Solving & Display -------------------------
+     ------------------------- Solving & Display -------------------------
     async function solveCrossword() {
         if (isSolving) {
             showWarning("Solver is already running.");
@@ -954,7 +951,7 @@
         return array;
     }
 
-    // Load words on page load
+     Load words on page load
     window.onload = loadWords;
 
 })();
