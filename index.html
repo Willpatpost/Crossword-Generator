@@ -10,6 +10,9 @@
         <h1>Custom Crossword Generator</h1>
     </header>
 
+    <!-- Added mode label here -->
+    <div id="modeLabel">Mode: Default</div>
+
     <main>
         <section id="settings" aria-label="Grid Size Settings">
             <h2>Select Grid Size</h2>
@@ -24,7 +27,7 @@
                 <option value="7">7</option>
                 <option value="8">8</option>
                 <option value="9">9</option>
-                <option value="10">10</option>
+                <option value="10" selected>10</option>
                 <option value="11">11</option>
                 <option value="12">12</option>
                 <option value="13">13</option>
@@ -48,7 +51,7 @@
                 <option value="7">7</option>
                 <option value="8">8</option>
                 <option value="9">9</option>
-                <option value="10">10</option>
+                <option value="10" selected>10</option>
                 <option value="11">11</option>
                 <option value="12">12</option>
                 <option value="13">13</option>
@@ -64,7 +67,6 @@
             <button id="generateGridButton">Generate Grid</button>
         </section>
 
-        <!-- New predefined puzzles section -->
         <section id="predefinedPuzzles" aria-label="Load Predefined Puzzles">
             <h2>Load Puzzle</h2>
             <button id="loadEasyPuzzle">Load Easy Puzzle</button>
@@ -75,6 +77,9 @@
         <section id="number-entry-controls" aria-label="Number Entry Controls">
             <button id="startNumberEntryButton">Enter Number Mode</button>
             <button id="stopNumberEntryButton" style="display: none;">Stop Entering Numbers</button>
+            <!-- Added Letter Entry and Drag Mode buttons directly to HTML -->
+            <button id="startLetterEntryButton">Letter Entry Mode</button>
+            <button id="startDragModeButton">Drag Mode</button>
         </section>
 
         <section id="crosswordGrid" aria-label="Crossword Grid Display">
