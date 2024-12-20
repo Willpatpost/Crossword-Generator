@@ -1,7 +1,8 @@
 (() => {
+    'use strict';
 
-     ------------------------- Configuration & Global Variables -------------------------
-    const DEBUG = true;  Toggle debug messages
+    // ------------------------- Configuration & Global Variables -------------------------
+    const DEBUG = true; // Toggle debug messages
     let isNumberEntryMode = false;
     let isLetterEntryMode = false;
     let isDragMode = false;
@@ -79,10 +80,19 @@
     ];
 
     // ------------------------- Utility & Logging -------------------------
+    /**
+     * Logs debug messages to the console if DEBUG is enabled.
+     * @param  {...any} params - The messages or objects to log.
+     */
     function debugLog(...params) {
         if (DEBUG) console.log(...params);
     }
 
+    /**
+     * Updates the status area with a new message.
+     * @param {string} message - The message to display.
+     * @param {boolean} clear - Whether to clear existing messages.
+     */
     function updateStatus(message, clear = false) {
         const statusDisplay = document.getElementById("result");
         if (clear) {
@@ -92,16 +102,50 @@
         debugLog(message);
     }
 
+    /**
+     * Displays a warning message in the notification area.
+     * @param {string} msg - The warning message.
+     */
     function showWarning(msg) {
-        alert(msg);
+        displayNotification(msg, 'warning');
     }
 
+    /**
+     * Displays an error message in the notification area.
+     * @param {string} msg - The error message.
+     */
     function showError(msg) {
-        alert("Error: " + msg);
+        displayNotification("Error: " + msg, 'error');
     }
 
+    /**
+     * Displays an informational message in the notification area.
+     * @param {string} msg - The informational message.
+     */
     function showInfo(msg) {
-        alert(msg);
+        displayNotification(msg, 'info');
+    }
+
+    /**
+     * Displays a notification message within the application.
+     * @param {string} msg - The message to display.
+     * @param {string} type - The type of message ('info', 'warning', 'error').
+     */
+    function displayNotification(msg, type = 'info') {
+        const notificationArea = document.getElementById("notification");
+        if (!notificationArea) {
+            console.warn("Notification area not found.");
+            return;
+        }
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('notification', type);
+        messageDiv.textContent = msg;
+        notificationArea.appendChild(messageDiv);
+
+        // Automatically remove the notification after 5 seconds
+        setTimeout(() => {
+            notificationArea.removeChild(messageDiv);
+        }, 5000);
     }
 
     // ------------------------- Mode Handling -------------------------
@@ -110,58 +154,72 @@
     modeLabel.textContent = "Mode: Default";
     document.body.insertBefore(modeLabel, document.body.firstChild);
 
-    document.getElementById("startNumberEntryButton").addEventListener("click", startNumberEntryMode);
-    document.getElementById("stopNumberEntryButton").addEventListener("click", stopNumberEntryMode);
+    const startNumberEntryButton = document.getElementById("startNumberEntryButton");
+    const stopNumberEntryButton = document.getElementById("stopNumberEntryButton");
+    const startLetterEntryButton = document.getElementById("startLetterEntryButton");
+    const startDragModeButton = document.getElementById("startDragModeButton");
 
-    const startLetterEntryButton = document.createElement('button');
-    startLetterEntryButton.textContent = "Letter Entry Mode";
-    document.getElementById('number-entry-controls').appendChild(startLetterEntryButton);
-
-    const startDragModeButton = document.createElement('button');
-    startDragModeButton.textContent = "Drag Mode";
-    document.getElementById('number-entry-controls').appendChild(startDragModeButton);
-
+    startNumberEntryButton.addEventListener("click", startNumberEntryMode);
+    stopNumberEntryButton.addEventListener("click", stopNumberEntryMode);
     startLetterEntryButton.addEventListener('click', toggleLetterEntryMode);
     startDragModeButton.addEventListener('click', toggleDragMode);
 
+    /**
+     * Updates the mode label text.
+     * @param {string} mode - The current mode.
+     */
     function updateModeLabelTxt(mode) {
         modeLabel.textContent = "Mode: " + mode;
     }
 
+    /**
+     * Activates Number Entry Mode.
+     */
     function startNumberEntryMode() {
         if (isLetterEntryMode) toggleLetterEntryMode();
         if (isDragMode) stopDragMode();
         if (!isNumberEntryMode) {
             isNumberEntryMode = true;
-            document.getElementById("stopNumberEntryButton").style.display = "inline";
+            startNumberEntryButton.style.display = "none";
+            stopNumberEntryButton.style.display = "inline";
             updateModeLabelTxt("Number Entry");
-            updateStatus("Number Entry Mode Activated.");
+            updateStatus("Number Entry Mode Activated.", true);
         }
     }
 
+    /**
+     * Deactivates Number Entry Mode.
+     */
     function stopNumberEntryMode() {
         isNumberEntryMode = false;
-        document.getElementById("stopNumberEntryButton").style.display = "none";
+        startNumberEntryButton.style.display = "inline";
+        stopNumberEntryButton.style.display = "none";
         updateModeLabelTxt("Default");
-        updateStatus("Number Entry Mode Deactivated.");
+        updateStatus("Number Entry Mode Deactivated.", true);
     }
 
+    /**
+     * Toggles Letter Entry Mode.
+     */
     function toggleLetterEntryMode() {
         if (isLetterEntryMode) {
             isLetterEntryMode = false;
             startLetterEntryButton.textContent = "Letter Entry Mode";
             updateModeLabelTxt("Default");
-            updateStatus("Letter Entry Mode Deactivated.");
+            updateStatus("Letter Entry Mode Deactivated.", true);
         } else {
             if (isNumberEntryMode) stopNumberEntryMode();
             if (isDragMode) stopDragMode();
             isLetterEntryMode = true;
             startLetterEntryButton.textContent = "Exit Letter Entry Mode";
             updateModeLabelTxt("Letter Entry");
-            updateStatus("Letter Entry Mode Activated.");
+            updateStatus("Letter Entry Mode Activated.", true);
         }
     }
 
+    /**
+     * Toggles Drag Mode.
+     */
     function toggleDragMode() {
         if (isDragMode) {
             stopDragMode();
@@ -171,28 +229,34 @@
             isDragMode = true;
             startDragModeButton.textContent = "Exit Drag Mode";
             updateModeLabelTxt("Drag");
-            updateStatus("Drag Mode Activated.");
+            updateStatus("Drag Mode Activated.", true);
             bindDragEvents();
         }
     }
 
+    /**
+     * Deactivates Drag Mode.
+     */
     function stopDragMode() {
         isDragMode = false;
         startDragModeButton.textContent = "Drag Mode";
         updateModeLabelTxt("Default");
-        updateStatus("Drag Mode Deactivated.");
+        updateStatus("Drag Mode Deactivated.", true);
         unbindDragEvents();
     }
 
     // ------------------------- Word Loading & Caching -------------------------
+    /**
+     * Loads words from 'Data/Words.txt'. Falls back to a default word list if fetching fails.
+     */
     async function loadWords() {
         try {
             const response = await fetch('Data/Words.txt');
-            if (!response.ok) throw new Error("Could not load words file");
+            if (!response.ok) throw new Error("Could not load Words.txt");
             const text = await response.text();
             words = text.split('\n').map(w => w.trim().toUpperCase()).filter(w => w);
             if (!words.every(w => /^[A-Z]+$/.test(w))) {
-                throw new Error("File contains invalid words.");
+                throw new Error("Words.txt contains invalid entries.");
             }
             cacheWordsByLength();
             calculateLetterFrequencies();
@@ -206,6 +270,9 @@
         }
     }
 
+    /**
+     * Caches words by their length for efficient access during solving.
+     */
     function cacheWordsByLength() {
         wordLengthCache.clear();
         for (const word of words) {
@@ -216,6 +283,9 @@
         debugLog("Word length cache created.");
     }
 
+    /**
+     * Calculates the frequency of each letter across all words.
+     */
     function calculateLetterFrequencies() {
         const allLetters = words.join('');
         const freq = {};
@@ -226,12 +296,21 @@
     }
 
     // ------------------------- Grid Management -------------------------
-    document.getElementById("generateGridButton").addEventListener("click", generateGrid);
-    document.getElementById("loadEasyPuzzle").addEventListener("click", () => loadPredefinedPuzzle("Easy"));
-    document.getElementById("loadMediumPuzzle").addEventListener("click", () => loadPredefinedPuzzle("Medium"));
-    document.getElementById("loadHardPuzzle").addEventListener("click", () => loadPredefinedPuzzle("Hard"));
-    document.getElementById("solveCrosswordButton").addEventListener("click", solveCrossword);
+    const generateGridButton = document.getElementById("generateGridButton");
+    const loadEasyPuzzleButton = document.getElementById("loadEasyPuzzle");
+    const loadMediumPuzzleButton = document.getElementById("loadMediumPuzzle");
+    const loadHardPuzzleButton = document.getElementById("loadHardPuzzle");
+    const solveCrosswordButton = document.getElementById("solveCrosswordButton");
 
+    generateGridButton.addEventListener("click", generateGrid);
+    loadEasyPuzzleButton.addEventListener("click", () => loadPredefinedPuzzle("Easy"));
+    loadMediumPuzzleButton.addEventListener("click", () => loadPredefinedPuzzle("Medium"));
+    loadHardPuzzleButton.addEventListener("click", () => loadPredefinedPuzzle("Hard"));
+    solveCrosswordButton.addEventListener("click", solveCrossword);
+
+    /**
+     * Generates a new crossword grid based on user-specified rows and columns.
+     */
     function generateGrid() {
         const rows = parseInt(document.getElementById("rows").value);
         const cols = parseInt(document.getElementById("columns").value);
@@ -243,24 +322,33 @@
 
         clearPuzzleState();
 
-        grid = Array.from({ length: rows }, () => Array(cols).fill("#"));
+        // Initialize grid with empty spaces
+        grid = Array.from({ length: rows }, () => Array(cols).fill(" "));
         renderGrid();
         debugLog("Grid generated with rows:", rows, "columns:", cols);
     }
 
+    /**
+     * Loads a predefined puzzle by name.
+     * @param {string} name - The name of the predefined puzzle to load.
+     */
     function loadPredefinedPuzzle(name) {
         const puzzle = predefinedPuzzles.find(p => p.name === name);
         if (!puzzle) {
-            showError(`Puzzle ${name} not found.`);
+            showError(`Puzzle "${name}" not found.`);
             return;
         }
         clearPuzzleState();
 
-        grid = puzzle.grid.map(r => r.slice());
+        // Deep copy the grid to prevent mutations
+        grid = puzzle.grid.map(row => [...row]);
         renderGrid();
         debugLog(`Loaded predefined puzzle: ${name}`);
     }
 
+    /**
+     * Clears the current puzzle state, including grid and solving data.
+     */
     function clearPuzzleState() {
         grid = [];
         solution = {};
@@ -268,12 +356,17 @@
         constraints.clear();
         domains.clear();
         cellContents.clear();
+        updateStatus("Puzzle state cleared.", true);
     }
 
+    /**
+     * Renders the crossword grid in the DOM.
+     */
     function renderGrid() {
         const gridContainer = document.getElementById("gridContainer");
         gridContainer.innerHTML = "";
         const fragment = document.createDocumentFragment();
+
         for (let r = 0; r < grid.length; r++) {
             const rowDiv = document.createElement("div");
             rowDiv.classList.add("grid-row");
@@ -296,9 +389,11 @@
                     cellDiv.classList.add("white-cell");
                 }
 
-                cellDiv.dataset.row = r;
-                cellDiv.dataset.col = c;
+                cellDiv.setAttribute('data-row', r);
+                cellDiv.setAttribute('data-col', c);
+                cellDiv.setAttribute('tabindex', '0'); // Make cells focusable
                 cellDiv.addEventListener("click", cellClicked);
+                cellDiv.addEventListener("keydown", cellKeyDown);
                 rowDiv.appendChild(cellDiv);
             }
             fragment.appendChild(rowDiv);
@@ -306,6 +401,10 @@
         gridContainer.appendChild(fragment);
     }
 
+    /**
+     * Handles cell click events based on the current mode.
+     * @param {Event} e - The click event.
+     */
     function cellClicked(e) {
         const cell = e.currentTarget;
         const row = parseInt(cell.dataset.row);
@@ -338,12 +437,66 @@
             grid[row][col] = " ";
             updateNumbersAfterRemoval(row, col);
         } else {
-            updateCell(row, col, "", "#333", "#333");
+            updateCell(row, col, "#", "#333", "#333");
             grid[row][col] = "#";
             updateNumbersAfterRemoval(row, col);
         }
     }
 
+    /**
+     * Handles keyboard navigation and interactions within grid cells.
+     * @param {Event} e - The keyboard event.
+     */
+    function cellKeyDown(e) {
+        const cell = e.currentTarget;
+        const row = parseInt(cell.dataset.row);
+        const col = parseInt(cell.dataset.col);
+
+        switch (e.key) {
+            case 'Enter':
+            case ' ':
+                cell.click();
+                e.preventDefault();
+                break;
+            case 'ArrowUp':
+                focusCell(row - 1, col);
+                e.preventDefault();
+                break;
+            case 'ArrowDown':
+                focusCell(row + 1, col);
+                e.preventDefault();
+                break;
+            case 'ArrowLeft':
+                focusCell(row, col - 1);
+                e.preventDefault();
+                break;
+            case 'ArrowRight':
+                focusCell(row, col + 1);
+                e.preventDefault();
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * Sets focus to a specific cell in the grid.
+     * @param {number} row - The row index of the cell.
+     * @param {number} col - The column index of the cell.
+     */
+    function focusCell(row, col) {
+        const cell = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
+        if (cell) {
+            cell.focus();
+        }
+    }
+
+    /**
+     * Handles number entry in Number Entry Mode.
+     * @param {HTMLElement} cell - The cell element.
+     * @param {number} row - The row index of the cell.
+     * @param {number} col - The column index of the cell.
+     */
     function handleNumberEntry(cell, row, col) {
         if (/^\d+$/.test(grid[row][col])) {
             // Remove number
@@ -355,6 +508,11 @@
         }
     }
 
+    /**
+     * Adds a sequential number to a cell.
+     * @param {number} row - The row index of the cell.
+     * @param {number} col - The column index of the cell.
+     */
     function addNumberToCell(row, col) {
         const numberPositions = getNumberPositions();
         const newNumber = getNewNumber(row, col, numberPositions);
@@ -363,6 +521,10 @@
         grid[row][col] = String(newNumber);
     }
 
+    /**
+     * Retrieves all numbered positions sorted in ascending order.
+     * @returns {Array} An array of [number, row, col] tuples.
+     */
     function getNumberPositions() {
         const numberPositions = [];
         for (let r = 0; r < grid.length; r++) {
@@ -377,6 +539,13 @@
         return numberPositions;
     }
 
+    /**
+     * Determines the new number to assign based on cell position.
+     * @param {number} row - The row index.
+     * @param {number} col - The column index.
+     * @param {Array} numberPositions - Existing numbered positions.
+     * @returns {number} The new number to assign.
+     */
     function getNewNumber(row, col, numberPositions) {
         let position = 0;
         for (let i = 0; i < numberPositions.length; i++) {
@@ -389,6 +558,12 @@
         return position + 1;
     }
 
+    /**
+     * Updates numbers in the grid after inserting a new number.
+     * @param {number} row - The row index.
+     * @param {number} col - The column index.
+     * @param {number} newNumber - The newly assigned number.
+     */
     function updateNumbersAfterInsertion(row, col, newNumber) {
         for (let r = 0; r < grid.length; r++) {
             for (let c = 0; c < grid[0].length; c++) {
@@ -404,6 +579,11 @@
         }
     }
 
+    /**
+     * Removes a number from a cell and updates subsequent numbers.
+     * @param {number} row - The row index.
+     * @param {number} col - The column index.
+     */
     function removeNumberFromCell(row, col) {
         const removedNumber = parseInt(grid[row][col]);
         grid[row][col] = " ";
@@ -422,12 +602,25 @@
         }
     }
 
+    /**
+     * Updates numbers after removing a cell's number.
+     * @param {number} row - The row index.
+     * @param {number} col - The column index.
+     */
     function updateNumbersAfterRemoval(row, col) {
         if (grid[row][col] && /^\d+$/.test(grid[row][col])) {
             removeNumberFromCell(row, col);
         }
     }
 
+    /**
+     * Updates a specific cell's content and styling.
+     * @param {number} row - The row index.
+     * @param {number} col - The column index.
+     * @param {string|null} value - The new value for the cell.
+     * @param {string|null} bg - The background color.
+     * @param {string|null} fg - The foreground (text) color.
+     */
     function updateCell(row, col, value, bg, fg) {
         const cell = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
         if (!cell) return;
@@ -435,7 +628,7 @@
         if (bg !== null) cell.style.backgroundColor = bg;
         if (fg !== null) cell.style.color = fg;
 
-        cell.classList.remove("black-cell", "white-cell", "prefilled-cell", "numbered-cell");
+        cell.classList.remove("black-cell", "white-cell", "prefilled-cell", "numbered-cell", "solved-cell");
         if (bg === "#333") {
             cell.classList.add("black-cell");
         } else {
@@ -446,6 +639,9 @@
     }
 
     // ------------------------- Drag Mode -------------------------
+    /**
+     * Binds mouse events for Drag Mode.
+     */
     function bindDragEvents() {
         const gridContainer = document.getElementById("gridContainer");
         gridContainer.addEventListener("mousedown", startDrag);
@@ -454,6 +650,9 @@
         gridContainer.addEventListener("mouseleave", stopDrag);
     }
 
+    /**
+     * Unbinds mouse events for Drag Mode.
+     */
     function unbindDragEvents() {
         const gridContainer = document.getElementById("gridContainer");
         gridContainer.removeEventListener("mousedown", startDrag);
@@ -462,6 +661,10 @@
         gridContainer.removeEventListener("mouseleave", stopDrag);
     }
 
+    /**
+     * Handles the start of a drag action.
+     * @param {MouseEvent} event - The mouse event.
+     */
     function startDrag(event) {
         if (!isDragMode) return;
         isDragging = true;
@@ -473,6 +676,10 @@
         toggleCell(row, col);
     }
 
+    /**
+     * Handles the dragging action over cells.
+     * @param {MouseEvent} event - The mouse event.
+     */
     function onDrag(event) {
         if (!isDragging) return;
         const cell = document.elementFromPoint(event.clientX, event.clientY);
@@ -482,24 +689,35 @@
         toggleCell(row, col);
     }
 
+    /**
+     * Handles the end of a drag action.
+     */
     function stopDrag() {
         if (!isDragMode) return;
         isDragging = false;
     }
 
+    /**
+     * Toggles a cell's state between black and white.
+     * @param {number} row - The row index.
+     * @param {number} col - The column index.
+     */
     function toggleCell(row, col) {
         const cellVal = grid[row][col];
         if (toggleToBlack && cellVal !== "#") {
-            updateCell(row, col, "", "#333", "#333");
+            updateCell(row, col, "#", "#333", "#333");
             grid[row][col] = "#";
             updateNumbersAfterRemoval(row, col);
         } else if (!toggleToBlack && cellVal === "#") {
-            updateCell(row, col, "", "#f8f9fa", "#444");
+            updateCell(row, col, " ", "#f8f9fa", "#444");
             grid[row][col] = " ";
         }
     }
 
-     ------------------------- Slot & Constraint Generation -------------------------
+    // ------------------------- Slot & Constraint Generation -------------------------
+    /**
+     * Generates slots (across and down) and sets up constraints for solving.
+     */
     function generateSlots() {
         slots.clear();
         domains.clear();
@@ -508,6 +726,7 @@
         const rows = grid.length;
         const cols = grid[0].length;
 
+        // Populate cellContents with prefilled letters or null
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 const cell = grid[r][c];
@@ -520,16 +739,19 @@
             }
         }
 
+        // Identify slots based on numbered cells
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 const cell = grid[r][c];
                 if (/^\d+$/.test(cell)) {
+                    // Across slot
                     if (c === 0 || grid[r][c - 1] === "#") {
                         const positions = getSlotPositions(r, c, "across");
                         if (positions.length >= 2) {
                             slots.set(`${cell}ACROSS`, positions);
                         }
                     }
+                    // Down slot
                     if (r === 0 || grid[r - 1][c] === "#") {
                         const positions = getSlotPositions(r, c, "down");
                         if (positions.length >= 2) {
@@ -544,6 +766,13 @@
         setupDomains();
     }
 
+    /**
+     * Retrieves the positions of cells in a slot based on direction.
+     * @param {number} r - The starting row index.
+     * @param {number} c - The starting column index.
+     * @param {string} direction - 'across' or 'down'.
+     * @returns {Array} An array of [row, col] tuples.
+     */
     function getSlotPositions(r, c, direction) {
         const positions = [];
         const rows = grid.length;
@@ -556,10 +785,14 @@
         return positions;
     }
 
+    /**
+     * Generates constraints between overlapping slots.
+     */
     function generateConstraints() {
         constraints.clear();
         const positionMap = new Map();
 
+        // Map each cell to the slots that include it
         for (const [slot, positions] of slots.entries()) {
             positions.forEach((pos, idx) => {
                 const key = `${pos[0]},${pos[1]}`;
@@ -568,6 +801,7 @@
             });
         }
 
+        // Establish constraints based on overlapping cells
         for (const overlaps of positionMap.values()) {
             if (overlaps.length > 1) {
                 for (let i = 0; i < overlaps.length; i++) {
@@ -589,6 +823,9 @@
         }
     }
 
+    /**
+     * Sets up domains (possible word assignments) for each slot.
+     */
     function setupDomains() {
         domains.clear();
         for (const [slot, positions] of slots.entries()) {
@@ -605,6 +842,12 @@
         }
     }
 
+    /**
+     * Checks if a word matches any pre-filled letters in a slot.
+     * @param {string} slot - The slot identifier.
+     * @param {string} word - The word to check.
+     * @returns {boolean} True if the word matches pre-filled letters, else false.
+     */
     function wordMatchesPreFilledLetters(slot, word) {
         const positions = slots.get(slot);
         for (let idx = 0; idx < positions.length; idx++) {
@@ -616,7 +859,11 @@
         return true;
     }
 
-     ------------------------- AC-3 Algorithm -------------------------
+    // ------------------------- AC-3 Algorithm -------------------------
+    /**
+     * Implements the AC-3 algorithm for constraint propagation.
+     * @returns {Promise<boolean>} Resolves to true if arc consistency is achieved, else false.
+     */
     async function ac3() {
         const queue = [];
         for (const [var1, neighbors] of constraints.entries()) {
@@ -627,7 +874,7 @@
 
         while (queue.length) {
             const [var1, var2] = queue.shift();
-            if (revise(var1, var2)) {
+            if (await revise(var1, var2)) {
                 if (domains.get(var1).length === 0) {
                     return false;
                 }
@@ -635,30 +882,42 @@
                     if (neighbor !== var2) queue.push([neighbor, var1]);
                 }
             }
-            await new Promise(res => setTimeout(res, 0));  yield to UI
+            // Yield control to the UI thread
+            await new Promise(res => setTimeout(res, 0));
         }
         return true;
     }
 
-    function revise(var1, var2) {
+    /**
+     * Revises the domain of var1 by removing values inconsistent with var2.
+     * @param {string} var1 - The first variable (slot).
+     * @param {string} var2 - The second variable (slot).
+     * @returns {Promise<boolean>} Resolves to true if the domain was revised, else false.
+     */
+    async function revise(var1, var2) {
         let revised = false;
         const overlaps = constraints.get(var1).get(var2);
         const domainVar1 = domains.get(var1);
         const domainVar2 = domains.get(var2);
         const newDomain = [];
 
-        outer: for (const word1 of domainVar1) {
+        for (const word1 of domainVar1) {
             if (!wordMatchesPreFilledLetters(var1, word1)) {
                 revised = true;
                 continue;
             }
+            let hasMatch = false;
             for (const word2 of domainVar2) {
                 if (wordsMatch(var1, word1, var2, word2)) {
-                    newDomain.push(word1);
-                    continue outer;
+                    hasMatch = true;
+                    break;
                 }
             }
-            revised = true;
+            if (hasMatch) {
+                newDomain.push(word1);
+            } else {
+                revised = true;
+            }
         }
 
         if (revised) {
@@ -667,6 +926,14 @@
         return revised;
     }
 
+    /**
+     * Checks if two words match based on their overlapping positions.
+     * @param {string} var1 - The first variable (slot).
+     * @param {string} word1 - The word assigned to var1.
+     * @param {string} var2 - The second variable (slot).
+     * @param {string} word2 - The word assigned to var2.
+     * @returns {boolean} True if words match at overlapping positions, else false.
+     */
     function wordsMatch(var1, word1, var2, word2) {
         const overlaps = constraints.get(var1).get(var2);
         for (const [idx1, idx2] of overlaps) {
@@ -675,7 +942,13 @@
         return true;
     }
 
-     ------------------------- Backtracking Search -------------------------
+    // ------------------------- Backtracking Search -------------------------
+    /**
+     * Initiates the backtracking search to find a solution.
+     * @param {Object} assignment - Current assignments of slots to words.
+     * @param {Object} cache - Cache for memoization.
+     * @returns {boolean} True if a solution is found, else false.
+     */
     function backtrackingSolve(assignment = {}, cache = {}) {
         if (Object.keys(assignment).length === slots.size) {
             solution = { ...assignment };
@@ -710,11 +983,16 @@
         return false;
     }
 
+    /**
+     * Selects the next unassigned variable using MRV and Degree heuristics.
+     * @param {Object} assignment - Current assignments.
+     * @returns {string|null} The selected slot or null if all are assigned.
+     */
     function selectUnassignedVariable(assignment) {
         const unassigned = Array.from(domains.keys()).filter(v => !(v in assignment));
         if (unassigned.length === 0) return null;
 
-         MRV
+        // MRV: Minimum Remaining Values
         let minSize = Infinity;
         let candidates = [];
         for (const v of unassigned) {
@@ -727,7 +1005,7 @@
             }
         }
 
-         Degree heuristic
+        // Degree Heuristic: Maximum Degree
         let maxDegree = -1;
         let degreeCandidates = [];
         for (const v of candidates) {
@@ -740,7 +1018,7 @@
             }
         }
 
-         If tied, choose randomly
+        // If tied, choose randomly
         if (degreeCandidates.length > 1) {
             return degreeCandidates[Math.floor(Math.random() * degreeCandidates.length)];
         }
@@ -748,23 +1026,52 @@
         return degreeCandidates[0];
     }
 
+    /**
+     * Orders domain values using the Least Constraining Value heuristic.
+     * @param {string} variable - The slot to assign.
+     * @param {Object} assignment - Current assignments.
+     * @returns {Array} Ordered list of possible words.
+     */
     function orderDomainValues(variable, assignment) {
         const values = domains.get(variable).slice();
-         Use letter frequency heuristic (least constraining)
-        values.sort((a, b) => valueScore(a) - valueScore(b));
-         Shuffle for randomness
-        shuffleArray(values);
+        // Least Constraining Value: Sort based on how few options they leave for neighbors
+        values.sort((a, b) => leastConstrainingValue(variable, a) - leastConstrainingValue(variable, b));
         return values;
     }
 
-    function valueScore(value) {
+    /**
+     * Calculates the least constraining value score for a word.
+     * @param {string} variable - The slot.
+     * @param {string} value - The word to evaluate.
+     * @returns {number} The score representing constraints imposed by the word.
+     */
+    function leastConstrainingValue(variable, value) {
         let score = 0;
-        for (const ch of value) {
-            score += (letterFrequencies[ch] || 0);
+        const neighbors = constraints.get(variable);
+        if (!neighbors) return score;
+
+        for (const [neighbor, overlaps] of neighbors.entries()) {
+            if (domains.has(neighbor)) {
+                for (const word of domains.get(neighbor)) {
+                    for (const [idx1, idx2] of overlaps) {
+                        if (value[idx1] === word[idx2]) {
+                            score++;
+                            break;
+                        }
+                    }
+                }
+            }
         }
         return score;
     }
 
+    /**
+     * Checks if assigning a word to a slot is consistent with current assignments.
+     * @param {string} variable - The slot.
+     * @param {string} value - The word to assign.
+     * @param {Object} assignment - Current assignments.
+     * @returns {boolean} True if consistent, else false.
+     */
     function isConsistent(variable, value, assignment) {
         if (!wordMatchesPreFilledLetters(variable, value)) return false;
 
@@ -782,6 +1089,13 @@
         return true;
     }
 
+    /**
+     * Performs forward checking after assigning a word to a slot.
+     * @param {string} variable - The slot.
+     * @param {string} value - The word assigned.
+     * @param {Object} assignment - Current assignments.
+     * @returns {Object|boolean} Inferences made or false if inconsistency found.
+     */
     function forwardCheck(variable, value, assignment) {
         const inferences = {};
         const neighbors = constraints.get(variable);
@@ -802,27 +1116,39 @@
         return inferences;
     }
 
+    /**
+     * Restores domains based on inferences made during backtracking.
+     * @param {Object} inferences - The inferences to restore.
+     */
     function restoreDomains(inferences) {
         if (!inferences) return;
         for (const variable in inferences) {
-            domains.set(variable, inferences[variable]);
+            if (inferences.hasOwnProperty(variable)) {
+                domains.set(variable, inferences[variable]);
+            }
         }
     }
 
+    /**
+     * Randomizes the order of domain values for variability in solutions.
+     */
     function randomizeDomains() {
         for (const domain of domains.values()) {
             shuffleArray(domain);
         }
     }
 
-     ------------------------- Solving & Display -------------------------
+    // ------------------------- Solving & Display -------------------------
+    /**
+     * Initiates the crossword solving process.
+     */
     async function solveCrossword() {
         if (isSolving) {
             showWarning("Solver is already running.");
             return;
         }
         isSolving = true;
-        document.getElementById("solveCrosswordButton").disabled = true;
+        solveCrosswordButton.disabled = true;
         updateStatus("Setting up constraints...", true);
 
         generateSlots();
@@ -830,7 +1156,7 @@
         if (slots.size === 0) {
             showWarning("No numbered slots found to solve.");
             isSolving = false;
-            document.getElementById("solveCrosswordButton").disabled = false;
+            solveCrosswordButton.disabled = false;
             return;
         }
 
@@ -860,23 +1186,27 @@
 
         if (result) {
             updateStatus("Solution found.");
-            const ac3Time = (endAC3 - startAC3) / 1000;
-            const btTime = (endBT - startBT) / 1000;
+            const ac3Time = ((endAC3 - startAC3) / 1000).toFixed(4);
+            const btTime = ((endBT - startBT) / 1000).toFixed(4);
             performanceData['AC-3'] = { time: ac3Time };
             performanceData['Backtracking'] = { time: btTime, calls: recursiveCalls };
             displaySolution();
             displayWordList();
-            const totalSolveTime = ac3Time + btTime;
-            updateStatus(`Total solving time: ${totalSolveTime.toFixed(2)} seconds`);
+            const totalSolveTime = (parseFloat(ac3Time) + parseFloat(btTime)).toFixed(4);
+            updateStatus(`Total solving time: ${totalSolveTime} seconds`);
             logPerformanceMetrics();
         } else {
             updateStatus("No possible solution found.");
+            showWarning("No possible solution could be found for the current grid.");
         }
 
-        document.getElementById("solveCrosswordButton").disabled = false;
+        solveCrosswordButton.disabled = false;
         isSolving = false;
     }
 
+    /**
+     * Displays the solved words on the grid.
+     */
     function displaySolution() {
         for (const [slot, word] of Object.entries(solution)) {
             const positions = slots.get(slot);
@@ -891,6 +1221,9 @@
         debugLog("Solution displayed on the grid.");
     }
 
+    /**
+     * Displays the list of solved words categorized as Across and Down.
+     */
     function displayWordList() {
         const across = [];
         const down = [];
@@ -919,13 +1252,19 @@
         resultArea.insertAdjacentText('beforeend', "\nAcross:\n" + across.join("\n") + "\n\nDown:\n" + down.join("\n"));
     }
 
+    /**
+     * Logs and displays performance metrics.
+     */
     function logPerformanceMetrics() {
         for (const [method, data] of Object.entries(performanceData)) {
-            updateStatus(`${method} - Time: ${data.time.toFixed(4)}s${data.calls ? ', Recursive Calls: ' + data.calls : ''}`);
+            updateStatus(`${method} - Time: ${data.time}s${data.calls ? ', Recursive Calls: ' + data.calls : ''}`);
         }
         debugLog(performanceData);
     }
 
+    /**
+     * Displays the sizes of domains for each slot after setup.
+     */
     function displayDomainSizes() {
         updateStatus("Domain Sizes After Setup:");
         const slotKeys = Array.from(domains.keys());
@@ -940,6 +1279,11 @@
         }
     }
 
+    /**
+     * Shuffles an array in place using the Fisher-Yates algorithm.
+     * @param {Array} array - The array to shuffle.
+     * @returns {Array} The shuffled array.
+     */
     function shuffleArray(array) {
         let m = array.length, t, i;
         while (m) {
@@ -951,7 +1295,31 @@
         return array;
     }
 
-     Load words on page load
-    window.onload = loadWords;
+    // ------------------------- Notification Area Creation -------------------------
+    /**
+     * Creates a notification area in the DOM for in-app messages.
+     */
+    function createNotificationArea() {
+        const notificationContainer = document.createElement('div');
+        notificationContainer.id = "notification";
+        notificationContainer.setAttribute('aria-live', 'polite');
+        notificationContainer.setAttribute('aria-atomic', 'true');
+        notificationContainer.style.position = 'fixed';
+        notificationContainer.style.top = '20px';
+        notificationContainer.style.right = '20px';
+        notificationContainer.style.zIndex = '1000';
+        document.body.appendChild(notificationContainer);
+    }
+
+    // ------------------------- Initialization -------------------------
+    /**
+     * Initializes the application by setting up necessary elements and loading words.
+     */
+    function initializeApp() {
+        createNotificationArea();
+        loadWords();
+    }
+
+    window.onload = initializeApp;
 
 })();
