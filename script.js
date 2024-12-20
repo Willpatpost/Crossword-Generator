@@ -1,12 +1,15 @@
 (() => {
-    // Encapsulate all variables and functions within an IIFE to avoid polluting the global scope.
+    // This JavaScript version aims to replicate the behavior and logic of the Python Tkinter version
+    // as closely as possible. It includes multiple modes (default, number entry, letter entry, drag),
+    // predefined puzzles, AC-3 + backtracking solver, performance metrics, and domain displays.
 
-    // Constants and configurations
-    const DEBUG = false; // Toggle debug messages
-    const wordLengthCache = new Map();
-    const memoizedMaxNumber = {};
+    // ------------------------- Configuration & Global Variables -------------------------
+    const DEBUG = true; // Toggle debug messages
+    let isNumberEntryMode = false;
+    let isLetterEntryMode = false;
+    let isDragMode = false;
+    let isDragging = false;
 
-    // Data structures
     let grid = [];
     let words = [];
     let slots = new Map();
@@ -14,10 +17,15 @@
     let solution = {};
     let domains = new Map();
     let cellContents = new Map();
-    let isNumberEntryMode = false;
     let currentNumber = 1;
-    let seed = Date.now(); // Use the current timestamp as the seed
-    console.log("Randomness initialized with Date.now():", Date.now());
+    let recursiveCalls = 0;
+    let performanceData = {};
+
+    const wordLengthCache = new Map();
+    let letterFrequencies = null;
+
+    let toggleToBlack = false; // used in drag mode
+    let isSolving = false;
 
     // Predefined puzzles
     const predefinedPuzzles = [
@@ -73,46 +81,134 @@
         }
     ];
 
-    // Helper function for logging
-    function debugLog(message, flag = DEBUG, ...optionalParams) {
-        if (flag) {
-            console.log(message, ...optionalParams);
+    // ------------------------- Utility & Logging -------------------------
+    function debugLog(...params) {
+        if (DEBUG) console.log(...params);
+    }
+
+    function updateStatus(message, clear = false) {
+        const statusDisplay = document.getElementById("result");
+        if (clear) {
+            statusDisplay.textContent = "";
+        }
+        statusDisplay.textContent += message + "\n";
+        debugLog(message);
+    }
+
+    function showWarning(msg) {
+        alert(msg);
+    }
+
+    function showError(msg) {
+        alert("Error: " + msg);
+    }
+
+    function showInfo(msg) {
+        alert(msg);
+    }
+
+    // ------------------------- Mode Handling -------------------------
+    const modeLabel = document.createElement('div');
+    modeLabel.id = "modeLabel";
+    modeLabel.textContent = "Mode: Default";
+    document.body.insertBefore(modeLabel, document.body.firstChild);
+
+    document.getElementById("startNumberEntryButton").addEventListener("click", startNumberEntryMode);
+    document.getElementById("stopNumberEntryButton").addEventListener("click", stopNumberEntryMode);
+
+    const startLetterEntryButton = document.createElement('button');
+    startLetterEntryButton.textContent = "Letter Entry Mode";
+    document.getElementById('number-entry-controls').appendChild(startLetterEntryButton);
+
+    const startDragModeButton = document.createElement('button');
+    startDragModeButton.textContent = "Drag Mode";
+    document.getElementById('number-entry-controls').appendChild(startDragModeButton);
+
+    startLetterEntryButton.addEventListener('click', toggleLetterEntryMode);
+    startDragModeButton.addEventListener('click', toggleDragMode);
+
+    function updateModeLabelTxt(mode) {
+        modeLabel.textContent = "Mode: " + mode;
+    }
+
+    function startNumberEntryMode() {
+        if (isLetterEntryMode) toggleLetterEntryMode();
+        if (isDragMode) stopDragMode();
+        if (!isNumberEntryMode) {
+            isNumberEntryMode = true;
+            document.getElementById("stopNumberEntryButton").style.display = "inline";
+            updateModeLabelTxt("Number Entry");
+            updateStatus("Number Entry Mode Activated.");
         }
     }
 
-    // Event listeners for buttons
-    document.getElementById("generateGridButton").addEventListener("click", generateGrid);
-    document.getElementById("startNumberEntryButton").addEventListener("click", startNumberEntryMode);
-    document.getElementById("stopNumberEntryButton").addEventListener("click", stopNumberEntryMode);
-    document.getElementById("solveCrosswordButton").addEventListener("click", solveCrossword);
+    function stopNumberEntryMode() {
+        isNumberEntryMode = false;
+        document.getElementById("stopNumberEntryButton").style.display = "none";
+        updateModeLabelTxt("Default");
+        updateStatus("Number Entry Mode Deactivated.");
+    }
 
-    // Event listeners for predefined puzzles
-    document.getElementById("loadEasyPuzzle").addEventListener("click", () => loadPredefinedPuzzle("Easy"));
-    document.getElementById("loadMediumPuzzle").addEventListener("click", () => loadPredefinedPuzzle("Medium"));
-    document.getElementById("loadHardPuzzle").addEventListener("click", () => loadPredefinedPuzzle("Hard"));
+    function toggleLetterEntryMode() {
+        if (isLetterEntryMode) {
+            isLetterEntryMode = false;
+            startLetterEntryButton.textContent = "Letter Entry Mode";
+            updateModeLabelTxt("Default");
+            updateStatus("Letter Entry Mode Deactivated.");
+        } else {
+            if (isNumberEntryMode) stopNumberEntryMode();
+            if (isDragMode) stopDragMode();
+            isLetterEntryMode = true;
+            startLetterEntryButton.textContent = "Exit Letter Entry Mode";
+            updateModeLabelTxt("Letter Entry");
+            updateStatus("Letter Entry Mode Activated.");
+        }
+    }
 
-    // Load words from an external file and cache by word length
+    function toggleDragMode() {
+        if (isDragMode) {
+            stopDragMode();
+        } else {
+            if (isNumberEntryMode) stopNumberEntryMode();
+            if (isLetterEntryMode) toggleLetterEntryMode();
+            isDragMode = true;
+            startDragModeButton.textContent = "Exit Drag Mode";
+            updateModeLabelTxt("Drag");
+            updateStatus("Drag Mode Activated.");
+            bindDragEvents();
+        }
+    }
+
+    function stopDragMode() {
+        isDragMode = false;
+        startDragModeButton.textContent = "Drag Mode";
+        updateModeLabelTxt("Default");
+        updateStatus("Drag Mode Deactivated.");
+        unbindDragEvents();
+    }
+
+    // ------------------------- Word Loading & Caching -------------------------
     async function loadWords() {
         try {
             const response = await fetch('Data/Words.txt');
             if (!response.ok) throw new Error("Could not load words file");
-
             const text = await response.text();
-            words = text.split('\n').map(word => word.trim().toUpperCase());
-
-            if (!words.every(word => /^[A-Z]+$/.test(word))) {
-                throw new Error("File contains invalid words. Ensure all entries are alphabetic.");
+            words = text.split('\n').map(w => w.trim().toUpperCase()).filter(w => w);
+            if (!words.every(w => /^[A-Z]+$/.test(w))) {
+                throw new Error("File contains invalid words.");
             }
-
             cacheWordsByLength();
+            calculateLetterFrequencies();
             debugLog("Words loaded:", words.length);
         } catch (error) {
             console.error("Error loading words:", error);
-            alert("Error loading words. Please check if Words.txt is available and correctly formatted.");
+            showWarning("Words.txt not found or invalid. Using fallback word list.");
+            words = ["LASER", "SAILS", "SHEET", "STEER", "HEEL", "HIKE", "KEEL", "KNOT"];
+            cacheWordsByLength();
+            calculateLetterFrequencies();
         }
     }
 
-    // Cache words by length to optimize domain setup
     function cacheWordsByLength() {
         wordLengthCache.clear();
         for (const word of words) {
@@ -123,190 +219,290 @@
         debugLog("Word length cache created.");
     }
 
-    // Initialize the grid with black cells
-    function generateGrid() {
-        // Clear any existing puzzle
-        grid = [];
-        solution = {};
-        slots.clear();
-        constraints.clear();
-        domains.clear();
-        cellContents.clear();
-        memoizedMaxNumber.value = null;
+    function calculateLetterFrequencies() {
+        const allLetters = words.join('');
+        const freq = {};
+        for (const ch of allLetters) {
+            freq[ch] = (freq[ch] || 0) + 1;
+        }
+        letterFrequencies = freq;
+    }
 
+    // ------------------------- Grid Management -------------------------
+    document.getElementById("generateGridButton").addEventListener("click", generateGrid);
+    document.getElementById("loadEasyPuzzle").addEventListener("click", () => loadPredefinedPuzzle("Easy"));
+    document.getElementById("loadMediumPuzzle").addEventListener("click", () => loadPredefinedPuzzle("Medium"));
+    document.getElementById("loadHardPuzzle").addEventListener("click", () => loadPredefinedPuzzle("Hard"));
+    document.getElementById("solveCrosswordButton").addEventListener("click", solveCrossword);
+
+    function generateGrid() {
         const rows = parseInt(document.getElementById("rows").value);
         const cols = parseInt(document.getElementById("columns").value);
 
         if (isNaN(rows) || isNaN(cols) || rows <= 0 || cols <= 0) {
-            alert("Please enter valid positive numbers for rows and columns.");
+            showError("Please enter valid positive numbers for rows and columns.");
             return;
         }
 
+        clearPuzzleState();
+
         grid = Array.from({ length: rows }, () => Array(cols).fill("#"));
-        const gridContainer = document.getElementById("gridContainer");
-        gridContainer.innerHTML = "";
-
-        // Batch DOM updates using DocumentFragment
-        const fragment = document.createDocumentFragment();
-
-        for (let r = 0; r < rows; r++) {
-            const rowDiv = document.createElement("div");
-            rowDiv.classList.add("grid-row");
-
-            for (let c = 0; c < cols; c++) {
-                const cellDiv = document.createElement("div");
-                cellDiv.classList.add("grid-cell", "black-cell");
-                cellDiv.dataset.row = r;
-                cellDiv.dataset.col = c;
-                cellDiv.addEventListener("click", () => toggleCellOrAddNumber(cellDiv));
-                rowDiv.appendChild(cellDiv);
-            }
-            fragment.appendChild(rowDiv);
-        }
-
-        gridContainer.appendChild(fragment);
-        memoizedMaxNumber.value = null; // Reset memoization
+        renderGrid();
         debugLog("Grid generated with rows:", rows, "columns:", cols);
     }
 
-    // Load a predefined puzzle
-    function loadPredefinedPuzzle(puzzleName) {
-        const puzzle = predefinedPuzzles.find(p => p.name === puzzleName);
+    function loadPredefinedPuzzle(name) {
+        const puzzle = predefinedPuzzles.find(p => p.name === name);
         if (!puzzle) {
-            alert(`Puzzle ${puzzleName} not found.`);
+            showError(`Puzzle ${name} not found.`);
             return;
         }
+        clearPuzzleState();
 
-        // Clear any existing puzzle
+        grid = puzzle.grid.map(r => r.slice());
+        renderGrid();
+        debugLog(`Loaded predefined puzzle: ${name}`);
+    }
+
+    function clearPuzzleState() {
         grid = [];
         solution = {};
         slots.clear();
         constraints.clear();
         domains.clear();
         cellContents.clear();
-        memoizedMaxNumber.value = null;
+    }
 
-        const rows = puzzle.grid.length;
-        const cols = puzzle.grid[0].length;
-
-        // Initialize the grid
-        grid = puzzle.grid.map(row => row.slice()); // Deep copy to avoid modifying the original
-
+    function renderGrid() {
         const gridContainer = document.getElementById("gridContainer");
         gridContainer.innerHTML = "";
-
-        // Batch DOM updates using DocumentFragment
         const fragment = document.createDocumentFragment();
-
-        for (let r = 0; r < rows; r++) {
+        for (let r = 0; r < grid.length; r++) {
             const rowDiv = document.createElement("div");
             rowDiv.classList.add("grid-row");
-
-            for (let c = 0; c < cols; c++) {
+            for (let c = 0; c < grid[0].length; c++) {
                 const cellDiv = document.createElement("div");
-                const cellValue = grid[r][c];
                 cellDiv.classList.add("grid-cell");
+                const val = grid[r][c];
 
-                cellDiv.dataset.row = r;
-                cellDiv.dataset.col = c;
-
-                if (cellValue === "#") {
+                if (val === "#") {
                     cellDiv.classList.add("black-cell");
-                } else if (/^\d+$/.test(cellValue)) {
+                } else if (/^\d+$/.test(val)) {
                     cellDiv.classList.add("white-cell", "numbered-cell");
-                    cellDiv.textContent = cellValue;
-                } else if (/^[A-Z]$/.test(cellValue)) {
+                    cellDiv.textContent = val;
+                } else if (/^[A-Z]$/.test(val)) {
                     cellDiv.classList.add("white-cell", "prefilled-cell");
-                    cellDiv.textContent = cellValue;
+                    cellDiv.textContent = val;
+                } else if (val.trim() === "") {
+                    cellDiv.classList.add("white-cell");
                 } else {
                     cellDiv.classList.add("white-cell");
                 }
 
-                cellDiv.addEventListener("click", () => toggleCellOrAddNumber(cellDiv));
+                cellDiv.dataset.row = r;
+                cellDiv.dataset.col = c;
+                cellDiv.addEventListener("click", cellClicked);
                 rowDiv.appendChild(cellDiv);
             }
             fragment.appendChild(rowDiv);
         }
-
         gridContainer.appendChild(fragment);
-        memoizedMaxNumber.value = null; // Reset memoization
-        debugLog(`Loaded predefined puzzle: ${puzzleName}`);
     }
 
-    // Toggle cell between black and white, add numbers, or pre-filled letters
-    function toggleCellOrAddNumber(cell) {
+    function cellClicked(e) {
+        const cell = e.currentTarget;
         const row = parseInt(cell.dataset.row);
         const col = parseInt(cell.dataset.col);
 
+        if (isDragMode) {
+            // In drag mode, clicking doesn't toggle cells. Dragging does.
+            return;
+        }
+
         if (isNumberEntryMode) {
-            if (!cell.classList.contains("black-cell") && !cell.textContent) {
-                cell.textContent = currentNumber++;
-                grid[row][col] = cell.textContent;
-                cell.classList.add("numbered-cell");
-                memoizedMaxNumber.value = currentNumber - 1;
-            } else {
-                alert("Number can only be placed on empty white cells.");
+            handleNumberEntry(cell, row, col);
+            return;
+        }
+
+        if (isLetterEntryMode) {
+            const letter = prompt("Enter a single letter (A-Z):");
+            if (letter && /^[A-Za-z]$/.test(letter)) {
+                updateCell(row, col, letter.toUpperCase(), "#f8f9fa", "#000");
+                grid[row][col] = letter.toUpperCase();
+            } else if (letter !== null) {
+                showWarning("Please enter a single letter (A-Z).");
             }
-        } else if (cell.classList.contains("black-cell")) {
-            cell.classList.replace("black-cell", "white-cell");
-            cell.textContent = "";
+            return;
+        }
+
+        // Default mode: toggle black/white
+        if (cell.classList.contains("black-cell")) {
+            updateCell(row, col, "", "#f8f9fa", "#444");
             grid[row][col] = " ";
-        } else if (cell.classList.contains("white-cell")) {
-            let letter = prompt("Enter a letter (or leave blank to toggle back to black):");
-            if (letter) {
-                letter = letter.toUpperCase();
-                if (/^[A-Z]$/.test(letter)) {
-                    cell.textContent = letter;
-                    cell.classList.add("prefilled-cell");
-                    grid[row][col] = letter;
-                } else {
-                    alert("Please enter a single letter A-Z.");
+            updateNumbersAfterRemoval(row, col);
+        } else {
+            updateCell(row, col, "", "#333", "#333");
+            grid[row][col] = "#";
+            updateNumbersAfterRemoval(row, col);
+        }
+    }
+
+    function handleNumberEntry(cell, row, col) {
+        if (/^\d+$/.test(grid[row][col])) {
+            // Remove number
+            removeNumberFromCell(row, col);
+        } else if (grid[row][col] !== "#") {
+            addNumberToCell(row, col);
+        } else {
+            showWarning("Cannot add number to a black cell.");
+        }
+    }
+
+    function addNumberToCell(row, col) {
+        const numberPositions = getNumberPositions();
+        const newNumber = getNewNumber(row, col, numberPositions);
+        updateNumbersAfterInsertion(row, col, newNumber);
+        updateCell(row, col, String(newNumber), "#f8f9fa", "#000");
+        grid[row][col] = String(newNumber);
+    }
+
+    function getNumberPositions() {
+        const numberPositions = [];
+        for (let r = 0; r < grid.length; r++) {
+            for (let c = 0; c < grid[0].length; c++) {
+                const val = grid[r][c];
+                if (val && /^\d+$/.test(val)) {
+                    numberPositions.push([parseInt(val), r, c]);
                 }
-            } else {
-                cell.classList.replace("white-cell", "black-cell");
-                cell.textContent = "";
-                grid[row][col] = "#";
             }
-        } else if (cell.classList.contains("prefilled-cell")) {
-            cell.classList.remove("prefilled-cell");
+        }
+        numberPositions.sort((a, b) => a[0] - b[0]);
+        return numberPositions;
+    }
+
+    function getNewNumber(row, col, numberPositions) {
+        let position = 0;
+        for (let i = 0; i < numberPositions.length; i++) {
+            const [num, rr, cc] = numberPositions[i];
+            if ((row < rr) || (row === rr && col < cc)) {
+                break;
+            }
+            position = i + 1;
+        }
+        return position + 1;
+    }
+
+    function updateNumbersAfterInsertion(row, col, newNumber) {
+        for (let r = 0; r < grid.length; r++) {
+            for (let c = 0; c < grid[0].length; c++) {
+                const val = grid[r][c];
+                if (val && /^\d+$/.test(val)) {
+                    const currentNumber = parseInt(val);
+                    if (currentNumber >= newNumber && (r !== row || c !== col)) {
+                        grid[r][c] = String(currentNumber + 1);
+                        updateCell(r, c, String(currentNumber + 1), null, null);
+                    }
+                }
+            }
+        }
+    }
+
+    function removeNumberFromCell(row, col) {
+        const removedNumber = parseInt(grid[row][col]);
+        grid[row][col] = " ";
+        updateCell(row, col, "", "#f8f9fa", "#444");
+        for (let r = 0; r < grid.length; r++) {
+            for (let c = 0; c < grid[0].length; c++) {
+                const val = grid[r][c];
+                if (val && /^\d+$/.test(val)) {
+                    const currentNumber = parseInt(val);
+                    if (currentNumber > removedNumber) {
+                        grid[r][c] = String(currentNumber - 1);
+                        updateCell(r, c, String(currentNumber - 1), null, null);
+                    }
+                }
+            }
+        }
+    }
+
+    function updateNumbersAfterRemoval(row, col) {
+        if (grid[row][col] && /^\d+$/.test(grid[row][col])) {
+            removeNumberFromCell(row, col);
+        }
+    }
+
+    function updateCell(row, col, value, bg, fg) {
+        const cell = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
+        if (!cell) return;
+        if (value !== null) cell.textContent = value;
+        if (bg !== null) cell.style.backgroundColor = bg;
+        if (fg !== null) cell.style.color = fg;
+
+        cell.classList.remove("black-cell", "white-cell", "prefilled-cell", "numbered-cell");
+        if (bg === "#333") {
+            cell.classList.add("black-cell");
+        } else {
             cell.classList.add("white-cell");
-            cell.textContent = "";
+            if (value && /^[A-Z]$/.test(value)) cell.classList.add("prefilled-cell");
+            if (value && /^\d+$/.test(value)) cell.classList.add("numbered-cell");
+        }
+    }
+
+    // ------------------------- Drag Mode -------------------------
+    function bindDragEvents() {
+        const gridContainer = document.getElementById("gridContainer");
+        gridContainer.addEventListener("mousedown", startDrag);
+        gridContainer.addEventListener("mousemove", onDrag);
+        gridContainer.addEventListener("mouseup", stopDrag);
+        gridContainer.addEventListener("mouseleave", stopDrag);
+    }
+
+    function unbindDragEvents() {
+        const gridContainer = document.getElementById("gridContainer");
+        gridContainer.removeEventListener("mousedown", startDrag);
+        gridContainer.removeEventListener("mousemove", onDrag);
+        gridContainer.removeEventListener("mouseup", stopDrag);
+        gridContainer.removeEventListener("mouseleave", stopDrag);
+    }
+
+    function startDrag(event) {
+        if (!isDragMode) return;
+        isDragging = true;
+        const cell = event.target.closest('.grid-cell');
+        if (!cell) return;
+        const row = parseInt(cell.dataset.row);
+        const col = parseInt(cell.dataset.col);
+        toggleToBlack = !cell.classList.contains("black-cell");
+        toggleCell(row, col);
+    }
+
+    function onDrag(event) {
+        if (!isDragging) return;
+        const cell = document.elementFromPoint(event.clientX, event.clientY);
+        if (!cell || !cell.classList.contains('grid-cell')) return;
+        const row = parseInt(cell.dataset.row);
+        const col = parseInt(cell.dataset.col);
+        toggleCell(row, col);
+    }
+
+    function stopDrag() {
+        if (!isDragMode) return;
+        isDragging = false;
+    }
+
+    function toggleCell(row, col) {
+        const cellVal = grid[row][col];
+        if (toggleToBlack && cellVal !== "#") {
+            updateCell(row, col, "", "#333", "#333");
+            grid[row][col] = "#";
+            updateNumbersAfterRemoval(row, col);
+        } else if (!toggleToBlack && cellVal === "#") {
+            updateCell(row, col, "", "#f8f9fa", "#444");
             grid[row][col] = " ";
         }
     }
 
-    // Start number-entry mode
-    function startNumberEntryMode() {
-        currentNumber = getMaxNumberOnGrid() + 1;
-        isNumberEntryMode = true;
-        document.getElementById("stopNumberEntryButton").style.display = "inline";
-        debugLog("Number entry mode started. Current number:", currentNumber);
-    }
-
-    // Stop number-entry mode
-    function stopNumberEntryMode() {
-        isNumberEntryMode = false;
-        document.getElementById("stopNumberEntryButton").style.display = "none";
-        debugLog("Number entry mode stopped.");
-    }
-
-    // Get the maximum number currently on the grid with memoization
-    function getMaxNumberOnGrid() {
-        if (memoizedMaxNumber.value !== null) {
-            return memoizedMaxNumber.value;
-        }
-        let maxNumber = 0;
-        for (const row of grid) {
-            for (const cell of row) {
-                const cellNumber = parseInt(cell);
-                if (!isNaN(cellNumber) && cellNumber > maxNumber) maxNumber = cellNumber;
-            }
-        }
-        memoizedMaxNumber.value = maxNumber;
-        return maxNumber;
-    }
-
-    // Generate slots and handle pre-filled letters
+    // ------------------------- Slot & Constraint Generation -------------------------
     function generateSlots() {
         slots.clear();
         domains.clear();
@@ -318,10 +514,11 @@
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 const cell = grid[r][c];
+                const key = `${r},${c}`;
                 if (/^[A-Z]$/.test(cell)) {
-                    cellContents.set(`${r},${c}`, cell);
+                    cellContents.set(key, cell);
                 } else if (cell !== "#" && cell.trim() !== "") {
-                    cellContents.set(`${r},${c}`, null);
+                    cellContents.set(key, null);
                 }
             }
         }
@@ -333,46 +530,35 @@
                     if (c === 0 || grid[r][c - 1] === "#") {
                         const positions = getSlotPositions(r, c, "across");
                         if (positions.length >= 2) {
-                            const slotName = `${cell}ACROSS`;
-                            slots.set(slotName, positions);
+                            slots.set(`${cell}ACROSS`, positions);
                         }
                     }
                     if (r === 0 || grid[r - 1][c] === "#") {
                         const positions = getSlotPositions(r, c, "down");
                         if (positions.length >= 2) {
-                            const slotName = `${cell}DOWN`;
-                            slots.set(slotName, positions);
+                            slots.set(`${cell}DOWN`, positions);
                         }
                     }
                 }
             }
         }
 
-        //debugLog("Generated Slots:", slots);
-
         generateConstraints();
         setupDomains();
     }
 
-    // Helper function to get slot positions in a direction
     function getSlotPositions(r, c, direction) {
         const positions = [];
         const rows = grid.length;
         const cols = grid[0].length;
-
         while (r < rows && c < cols && grid[r][c] !== "#") {
             positions.push([r, c]);
-            if (direction === "across") {
-                c++;
-            } else {
-                r++;
-            }
+            if (direction === "across") c++;
+            else r++;
         }
-
         return positions;
     }
 
-    // Generate constraints based on slot intersections
     function generateConstraints() {
         constraints.clear();
         const positionMap = new Map();
@@ -404,98 +590,75 @@
                 }
             }
         }
-
-        //debugLog("Generated Constraints:", constraints);
     }
 
-    // Set up domains for each slot using regex for faster filtering
     function setupDomains() {
         domains.clear();
         for (const [slot, positions] of slots.entries()) {
             const length = positions.length;
-            let regexPattern = positions.map(([r, c]) => {
+            const regexPattern = positions.map(([r, c]) => {
                 const content = cellContents.get(`${r},${c}`);
                 return content ? content : '.';
             }).join('');
+
             const regex = new RegExp(`^${regexPattern}$`);
-
             const possibleWords = wordLengthCache.get(length) || [];
-            const filteredWords = possibleWords.filter(word => regex.test(word));
-
-            if (filteredWords.length === 0) {
-                console.warn(`Domain for slot ${slot} is empty after setup.`);
-            }
-
+            const filteredWords = possibleWords.filter(w => regex.test(w));
             domains.set(slot, filteredWords);
         }
-
-        //debugLog("Domains after setup:", domains);
     }
 
-    // Function to check if a word matches the pre-filled letters in a slot
     function wordMatchesPreFilledLetters(slot, word) {
         const positions = slots.get(slot);
         for (let idx = 0; idx < positions.length; idx++) {
-            const [row, col] = positions[idx];
-            const key = `${row},${col}`;
-            const preFilledLetter = cellContents.get(key);
-            if (preFilledLetter && preFilledLetter !== word[idx]) {
-                return false;
-            }
+            const [r, c] = positions[idx];
+            const key = `${r},${c}`;
+            const preFilled = cellContents.get(key);
+            if (preFilled && preFilled !== word[idx]) return false;
         }
         return true;
     }
 
-    // AC-3 Algorithm with asynchronicity for better UI responsiveness
+    // ------------------------- AC-3 Algorithm -------------------------
     async function ac3() {
-    const queue = [];
-
-    for (const [var1, neighbors] of constraints.entries()) {
-        for (const var2 of neighbors.keys()) {
-            queue.push([var1, var2]);
-        }
-    }
-
-    // Prioritize variables with smaller domains
-    queue.sort((a, b) => domains.get(a[0]).length - domains.get(b[0]).length);
-
-    while (queue.length) {
-        const [var1, var2] = queue.shift();
-        if (revise(var1, var2)) {
-            if (!domains.get(var1).length) {
-                return false;
-            }
-            for (const neighbor of constraints.get(var1).keys()) {
-                if (neighbor !== var2) queue.push([neighbor, var1]);
+        const queue = [];
+        for (const [var1, neighbors] of constraints.entries()) {
+            for (const var2 of neighbors.keys()) {
+                queue.push([var1, var2]);
             }
         }
-        await new Promise(resolve => setTimeout(resolve, 0)); // Yield to UI
-    }
-    return true;
+
+        while (queue.length) {
+            const [var1, var2] = queue.shift();
+            if (revise(var1, var2)) {
+                if (domains.get(var1).length === 0) {
+                    return false;
+                }
+                for (const neighbor of constraints.get(var1).keys()) {
+                    if (neighbor !== var2) queue.push([neighbor, var1]);
+                }
+            }
+            await new Promise(res => setTimeout(res, 0)); // yield to UI
+        }
+        return true;
     }
 
-    // Function to revise domains for consistency
     function revise(var1, var2) {
         let revised = false;
         const overlaps = constraints.get(var1).get(var2);
-
         const domainVar1 = domains.get(var1);
         const domainVar2 = domains.get(var2);
-
         const newDomain = [];
 
-        outerLoop:
-        for (const word1 of domainVar1) {
-            // Check if word1 matches pre-filled letters in var1
+        outer: for (const word1 of domainVar1) {
             if (!wordMatchesPreFilledLetters(var1, word1)) {
                 revised = true;
                 continue;
             }
-
             for (const word2 of domainVar2) {
                 if (wordsMatch(var1, word1, var2, word2)) {
                     newDomain.push(word1);
-                    continue outerLoop;
+                    continue outer;
                 }
             }
             revised = true;
@@ -507,106 +670,6 @@
         return revised;
     }
 
-    // Backtracking Search with MRV and Degree Heuristics
-    function backtrackingSolve(assignment = {}) {
-        if (Object.keys(assignment).length === slots.size) {
-            solution = { ...assignment }; // Clone the assignment
-            debugLog("Solution found:", solution);
-            return true;
-        }
-
-        const varToAssign = selectUnassignedVariable(assignment);
-        if (!varToAssign) return false;
-        // debugLog("Selecting variable to assign:", varToAssign);
-
-        for (const value of orderDomainValues(varToAssign, assignment)) {
-            debugLog(`Trying ${value} for ${varToAssign}`);
-            if (isConsistent(varToAssign, value, assignment)) {
-                assignment[varToAssign] = value;
-                const inferences = forwardCheck(varToAssign, value, assignment);
-                if (inferences !== false) {
-                    const result = backtrackingSolve(assignment);
-                    if (result) return result;
-                }
-                delete assignment[varToAssign];
-                restoreDomains(inferences);
-            }
-        }
-        return false;
-    }
-
-    // MRV with degree heuristic tie-breaker
-    function selectUnassignedVariable(assignment) {
-        const unassignedVars = Array.from(domains.keys()).filter(v => !(v in assignment));
-        if (unassignedVars.length === 0) return null;
-    
-        unassignedVars.sort((a, b) => {
-            const lenA = domains.get(a).length;
-            const lenB = domains.get(b).length;
-            if (lenA !== lenB) return lenA - lenB;
-    
-            const degreeA = constraints.get(a) ? constraints.get(a).size : 0;
-            const degreeB = constraints.get(b) ? constraints.get(b).size : 0;
-            if (degreeA !== degreeB) return degreeB - degreeA;
-    
-            // Introduce slight randomness for variables with identical MRV and degree
-            return Math.random() - 0.5;
-        });
-        return unassignedVars[0];
-    }
-
-    // Least Constraining Value heuristic with domain shuffling for randomization
-    function orderDomainValues(variable, assignment) {
-        const domainValues = domains.get(variable).slice();
-        return domainValues.sort((a, b) => {
-            const conflictsA = countConflicts(variable, a, assignment);
-            const conflictsB = countConflicts(variable, b, assignment);
-            return conflictsA - conflictsB; // Least constraining first
-        });
-    }
-    
-    function countConflicts(variable, value, assignment) {
-        let conflicts = 0;
-        const neighbors = constraints.get(variable);
-        if (!neighbors) return conflicts;
-    
-        for (const neighbor of neighbors.keys()) {
-            if (!(neighbor in assignment)) {
-                for (const neighborValue of domains.get(neighbor)) {
-                    if (!wordsMatch(variable, value, neighbor, neighborValue)) {
-                        conflicts++;
-                    }
-                }
-            }
-        }
-        return conflicts;
-    }
-
-    // Consistency check function
-    function isConsistent(variable, value, assignment) {
-        if (!wordMatchesPreFilledLetters(variable, value)) {
-            return false;
-        }
-    
-        const neighbors = constraints.get(variable);
-        if (!neighbors) return true;
-    
-        for (const neighbor of neighbors.keys()) {
-            if (!(neighbor in assignment)) {
-                const newDomain = domains.get(neighbor).filter(neighborValue => {
-                    return wordsMatch(variable, value, neighbor, neighborValue);
-                });
-                if (newDomain.length === 0) {
-                    return false; // Forward check failure
-                }
-            } else if (!wordsMatch(variable, value, neighbor, assignment[neighbor])) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // Check word alignment consistency
     function wordsMatch(var1, word1, var2, word2) {
         const overlaps = constraints.get(var1).get(var2);
         for (const [idx1, idx2] of overlaps) {
@@ -615,7 +678,113 @@
         return true;
     }
 
-    // Forward Checking with domain restoration
+    // ------------------------- Backtracking Search -------------------------
+    function backtrackingSolve(assignment = {}, cache = {}) {
+        if (Object.keys(assignment).length === slots.size) {
+            solution = { ...assignment };
+            return true;
+        }
+
+        recursiveCalls++;
+
+        const assignmentKey = JSON.stringify(Object.keys(assignment).sort().map(k => [k, assignment[k]]));
+        if (cache[assignmentKey] !== undefined) return cache[assignmentKey];
+
+        const varToAssign = selectUnassignedVariable(assignment);
+        if (!varToAssign) return false;
+
+        for (const value of orderDomainValues(varToAssign, assignment)) {
+            if (isConsistent(varToAssign, value, assignment)) {
+                assignment[varToAssign] = value;
+                const inferences = forwardCheck(varToAssign, value, assignment);
+                if (inferences !== false) {
+                    const result = backtrackingSolve(assignment, cache);
+                    if (result) {
+                        cache[assignmentKey] = true;
+                        return true;
+                    }
+                }
+                delete assignment[varToAssign];
+                restoreDomains(inferences);
+            }
+        }
+
+        cache[assignmentKey] = false;
+        return false;
+    }
+
+    function selectUnassignedVariable(assignment) {
+        const unassigned = Array.from(domains.keys()).filter(v => !(v in assignment));
+        if (unassigned.length === 0) return null;
+
+        // MRV
+        let minSize = Infinity;
+        let candidates = [];
+        for (const v of unassigned) {
+            const size = domains.get(v).length;
+            if (size < minSize) {
+                minSize = size;
+                candidates = [v];
+            } else if (size === minSize) {
+                candidates.push(v);
+            }
+        }
+
+        // Degree heuristic
+        let maxDegree = -1;
+        let degreeCandidates = [];
+        for (const v of candidates) {
+            const deg = constraints.has(v) ? constraints.get(v).size : 0;
+            if (deg > maxDegree) {
+                maxDegree = deg;
+                degreeCandidates = [v];
+            } else if (deg === maxDegree) {
+                degreeCandidates.push(v);
+            }
+        }
+
+        // If tied, choose randomly
+        if (degreeCandidates.length > 1) {
+            return degreeCandidates[Math.floor(Math.random() * degreeCandidates.length)];
+        }
+
+        return degreeCandidates[0];
+    }
+
+    function orderDomainValues(variable, assignment) {
+        const values = domains.get(variable).slice();
+        // Use letter frequency heuristic (least constraining)
+        values.sort((a, b) => valueScore(a) - valueScore(b));
+        // Shuffle for randomness
+        shuffleArray(values);
+        return values;
+    }
+
+    function valueScore(value) {
+        let score = 0;
+        for (const ch of value) {
+            score += (letterFrequencies[ch] || 0);
+        }
+        return score;
+    }
+
+    function isConsistent(variable, value, assignment) {
+        if (!wordMatchesPreFilledLetters(variable, value)) return false;
+
+        const neighbors = constraints.get(variable);
+        if (!neighbors) return true;
+
+        for (const neighbor of neighbors.keys()) {
+            if (assignment[neighbor]) {
+                if (!wordsMatch(variable, value, neighbor, assignment[neighbor])) return false;
+            } else {
+                const newDomain = domains.get(neighbor).filter(v => wordsMatch(variable, value, neighbor, v));
+                if (newDomain.length === 0) return false;
+            }
+        }
+        return true;
+    }
+
     function forwardCheck(variable, value, assignment) {
         const inferences = {};
         const neighbors = constraints.get(variable);
@@ -625,11 +794,9 @@
             if (!(neighbor in assignment)) {
                 inferences[neighbor] = domains.get(neighbor).slice();
                 const newDomain = domains.get(neighbor).filter(val => {
-                    // Ensure val matches pre-filled letters in neighbor
                     return wordsMatch(variable, value, neighbor, val) && wordMatchesPreFilledLetters(neighbor, val);
                 });
                 if (newDomain.length === 0) {
-                    debugLog(`Domain wiped out for ${neighbor} during forward checking.`);
                     return false;
                 }
                 domains.set(neighbor, newDomain);
@@ -638,7 +805,6 @@
         return inferences;
     }
 
-    // Restore domain states after backtracking
     function restoreDomains(inferences) {
         if (!inferences) return;
         for (const variable in inferences) {
@@ -646,98 +812,79 @@
         }
     }
 
-    // Solve the crossword with UI feedback and debug
-    async function solveCrossword() {
-        // Shuffle domains for randomness
-        randomizeDomains();
-    
-        document.getElementById("result").textContent = "Setting up constraints...";
-        generateSlots();
-    
-        if (slots.size === 0) {
-            alert("No numbered slots found to solve.");
-            return;
-        }
-    
-        await new Promise(resolve => setTimeout(resolve, 10)); // Allow UI update
-    
-        debugLog("Starting AC-3 algorithm...");
-        document.getElementById("result").textContent = "Running AC-3 algorithm...";
-    
-        // Start profiling for AC-3
-        console.time("AC-3 Execution");
-        const ac3Result = await ac3();
-        console.timeEnd("AC-3 Execution");
-    
-        // Log domain sizes and check for empty domains
-        let hasEmptyDomain = false;
-        for (const [slot, domain] of domains.entries()) {
-            if (domain.length === 0) {
-                console.warn(`Domain for ${slot} is empty after AC-3. Falling back to backtracking.`);
-                hasEmptyDomain = true;
-            } else {
-                console.log(`Domain for ${slot} has ${domain.length} options.`);
-            }
-        }
-    
-        if (!ac3Result || hasEmptyDomain) {
-            // AC-3 failed or resulted in empty domains
-            console.warn("AC-3 failed or over-pruned; attempting backtracking without full arc consistency.");
-            const result = backtrackingSolve();
-            if (result) {
-                displaySolution();
-                document.getElementById("result").textContent = "Crossword solved!";
-                displayWordList();
-            } else {
-                document.getElementById("result").textContent = "No possible solution.";
-            }
-        } else {
-            // AC-3 succeeded, continue with regular backtracking
-            document.getElementById("result").textContent = "Starting backtracking search...";
-    
-            // Start profiling for backtracking search
-            console.time("Backtracking Execution");
-            const result = backtrackingSolve();
-            console.timeEnd("Backtracking Execution");
-    
-            if (result) {
-                displaySolution();
-                document.getElementById("result").textContent = "Crossword solved!";
-                displayWordList();
-            } else {
-                document.getElementById("result").textContent = "No possible solution.";
-            }
-        }
-    }
-    
-    // Helper function to shuffle an array (Fisher-Yates algorithm)
-    function shuffleArray(array) {
-        let m = array.length, t, i;
-    
-        while (m) {
-            i = Math.floor(Math.random() * m--); // Directly use Math.random()
-            t = array[m];
-            array[m] = array[i];
-            array[i] = t;
-        }
-    
-        return array;
-    }
-
-    // Shuffle domains to introduce randomness in value order
     function randomizeDomains() {
         for (const domain of domains.values()) {
             shuffleArray(domain);
         }
     }
 
-    // Display the solution on the grid
+    // ------------------------- Solving & Display -------------------------
+    async function solveCrossword() {
+        if (isSolving) {
+            showWarning("Solver is already running.");
+            return;
+        }
+        isSolving = true;
+        document.getElementById("solveCrosswordButton").disabled = true;
+        updateStatus("Setting up constraints...", true);
+
+        generateSlots();
+
+        if (slots.size === 0) {
+            showWarning("No numbered slots found to solve.");
+            isSolving = false;
+            document.getElementById("solveCrosswordButton").disabled = false;
+            return;
+        }
+
+        randomizeDomains();
+        updateStatus("Running AC-3 algorithm...");
+        const startAC3 = performance.now();
+        const ac3Result = await ac3();
+        const endAC3 = performance.now();
+
+        let hasEmptyDomain = false;
+        for (const [slot, domain] of domains.entries()) {
+            if (domain.length === 0) hasEmptyDomain = true;
+        }
+
+        if (!ac3Result || hasEmptyDomain) {
+            updateStatus("AC-3 failed or domains emptied. Attempting backtracking...");
+        } else {
+            updateStatus("Starting backtracking search...");
+        }
+
+        displayDomainSizes();
+
+        recursiveCalls = 0;
+        const startBT = performance.now();
+        const result = backtrackingSolve();
+        const endBT = performance.now();
+
+        if (result) {
+            updateStatus("Solution found.");
+            const ac3Time = (endAC3 - startAC3) / 1000;
+            const btTime = (endBT - startBT) / 1000;
+            performanceData['AC-3'] = { time: ac3Time };
+            performanceData['Backtracking'] = { time: btTime, calls: recursiveCalls };
+            displaySolution();
+            displayWordList();
+            const totalSolveTime = ac3Time + btTime;
+            updateStatus(`Total solving time: ${totalSolveTime.toFixed(2)} seconds`);
+            logPerformanceMetrics();
+        } else {
+            updateStatus("No possible solution found.");
+        }
+
+        document.getElementById("solveCrosswordButton").disabled = false;
+        isSolving = false;
+    }
+
     function displaySolution() {
         for (const [slot, word] of Object.entries(solution)) {
             const positions = slots.get(slot);
-
-            positions.forEach(([row, col], idx) => {
-                const cell = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
+            positions.forEach(([r, c], idx) => {
+                const cell = document.querySelector(`.grid-cell[data-row="${r}"][data-col="${c}"]`);
                 if (cell) {
                     cell.textContent = word[idx];
                     cell.classList.add("solved-cell");
@@ -747,25 +894,67 @@
         debugLog("Solution displayed on the grid.");
     }
 
-    // Display word list organized by slot number and direction
     function displayWordList() {
-        const resultArea = document.getElementById("result");
-        const acrossWords = [];
-        const downWords = [];
+        const across = [];
+        const down = [];
 
-        for (const slot of slots.keys()) {
+        const slotKeys = Array.from(slots.keys());
+        slotKeys.sort((a, b) => {
+            const numA = parseInt(a.match(/^\d+/));
+            const numB = parseInt(b.match(/^\d+/));
+            return numA - numB;
+        });
+
+        for (const slot of slotKeys) {
             const word = solution[slot];
-            if (slot.endsWith("ACROSS")) {
-                acrossWords.push(`${slot}: ${word}`);
-            } else if (slot.endsWith("DOWN")) {
-                downWords.push(`${slot}: ${word}`);
+            if (word) {
+                const slotNumber = slot.match(/^\d+/)[0];
+                const entry = `${slotNumber}: ${word}`;
+                if (slot.endsWith("ACROSS")) {
+                    across.push(entry);
+                } else if (slot.endsWith("DOWN")) {
+                    down.push(entry);
+                }
             }
         }
 
-        resultArea.innerHTML = `<h3>Across:</h3><p>${acrossWords.join('<br>')}</p><h3>Down:</h3><p>${downWords.join('<br>')}</p>`;
+        const resultArea = document.getElementById("result");
+        resultArea.insertAdjacentText('beforeend', "\nAcross:\n" + across.join("\n") + "\n\nDown:\n" + down.join("\n"));
     }
 
-    // Initialize word list on page load
+    function logPerformanceMetrics() {
+        for (const [method, data] of Object.entries(performanceData)) {
+            updateStatus(`${method} - Time: ${data.time.toFixed(4)}s${data.calls ? ', Recursive Calls: ' + data.calls : ''}`);
+        }
+        debugLog(performanceData);
+    }
+
+    function displayDomainSizes() {
+        updateStatus("Domain Sizes After Setup:");
+        const slotKeys = Array.from(domains.keys());
+        slotKeys.sort((a, b) => {
+            const numA = parseInt(a.match(/^\d+/));
+            const numB = parseInt(b.match(/^\d+/));
+            return numA - numB;
+        });
+        for (const slot of slotKeys) {
+            const size = domains.get(slot).length;
+            updateStatus(`Domain for ${slot} has ${size} options.`);
+        }
+    }
+
+    function shuffleArray(array) {
+        let m = array.length, t, i;
+        while (m) {
+            i = Math.floor(Math.random() * m--);
+            t = array[m];
+            array[m] = array[i];
+            array[i] = t;
+        }
+        return array;
+    }
+
+    // Load words on page load
     window.onload = loadWords;
 
 })();
