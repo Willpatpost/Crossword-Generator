@@ -1,3 +1,49 @@
+/* ------------------------- CSS Variables ------------------------- */
+:root {
+    /* Color Palette */
+    --color-background: #f0f2f5;
+    --color-text: #333333;
+    --color-header: #222222;
+    --color-mode-label: #555555;
+    --color-white-cell: #f8f9fa;
+    --color-black-cell: #333333;
+    --color-solved-cell-bg: #d1e7dd;
+    --color-solved-cell-text: #155724;
+    --color-button: #0069d9;
+    --color-button-hover: #0056b3;
+    --color-button-active: #004494;
+    --color-button-disabled: #cccccc;
+    --color-button-danger: #dc3545;
+    --color-button-danger-hover: #c82333;
+    --color-notification-info: #17a2b8;
+    --color-notification-warning: #ffc107;
+    --color-notification-error: #dc3545;
+    --color-notification-background: rgba(255, 255, 255, 0.9);
+    
+    /* Sizing */
+    --cell-size: 30px;
+    --cell-border: 1px solid #666666;
+    --grid-border: 3px solid #444444;
+    --grid-padding: 5px;
+    --transition-duration: 0.3s;
+    
+    /* Font */
+    --font-family: 'Roboto', sans-serif;
+    --font-size-base: 1em;
+    --font-size-large: 2.2em;
+    --font-size-medium: 1.5em;
+    --font-size-small: 1.1em;
+    
+    /* Spacing */
+    --spacing-small: 5px;
+    --spacing-medium: 15px;
+    --spacing-large: 25px;
+    
+    /* Z-Index for Notifications */
+    --z-index-notification: 1000;
+}
+
+/* ------------------------- Global Styles ------------------------- */
 /* Basic reset for consistency */
 * {
     margin: 0;
@@ -7,204 +53,208 @@
 
 /* Body styling */
 body {
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-family);
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 20px;
-    background-color: #f0f2f5;
-    color: #333;
+    padding: var(--spacing-large);
+    background-color: var(--color-background);
+    color: var(--color-text);
 }
 
-/* Page title styling */
+/* Header styling */
+header {
+    margin-bottom: var(--spacing-large);
+}
+
 h1 {
-    color: #222;
-    font-size: 2.2em;
-    margin-bottom: 25px;
+    color: var(--color-header);
+    font-size: var(--font-size-large);
+    margin-bottom: var(--spacing-medium);
     font-weight: 600;
-}
-
-/* Mode label styling */
-#modeLabel {
-    font-size: 1.2em;
-    color: #555;
-    margin-bottom: 15px;
     text-align: center;
 }
 
-/* Settings container styling */
-#settings {
-    margin-bottom: 20px;
+/* Mode Label styling */
+#modeLabel {
+    font-size: 1.2em;
+    color: var(--color-mode-label);
+    margin-bottom: var(--spacing-medium);
+    text-align: center;
 }
 
-/* Grid container styling */
+/* Form Group styling */
+.form-group {
+    margin-bottom: var(--spacing-small);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Label styling */
+label {
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+/* Select styling */
+select {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: var(--font-size-base);
+    background-color: #fff;
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+select:focus {
+    outline: 2px solid var(--color-button);
+}
+
+/* Button Group styling */
+.button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-small);
+    margin-bottom: var(--spacing-medium);
+}
+
+/* Button styling */
+button {
+    padding: 10px 20px;
+    margin: 5px;
+    background-color: var(--color-button);
+    color: #ffffff;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    font-weight: 500;
+    transition: background-color 0.2s, transform 0.1s;
+    text-align: center;
+    font-size: var(--font-size-base);
+}
+
+button:disabled {
+    background-color: var(--color-button-disabled);
+    cursor: not-allowed;
+}
+
+button:hover:not(:disabled) {
+    background-color: var(--color-button-hover);
+    transform: scale(1.05);
+}
+
+button:active:not(:disabled) {
+    transform: scale(1);
+}
+
+/* Danger Button styling */
+#stopNumberEntryButton {
+    background-color: var(--color-button-danger);
+}
+
+#stopNumberEntryButton:hover {
+    background-color: var(--color-button-danger-hover);
+}
+
+#stopNumberEntryButton:active {
+    transform: scale(1);
+}
+
+/* Crossword Grid styling */
+#crosswordGrid {
+    margin-bottom: var(--spacing-large);
+}
+
+#crosswordGrid h2 {
+    font-size: var(--font-size-medium);
+    margin-bottom: var(--spacing-small);
+    text-align: center;
+}
+
 #gridContainer {
     display: inline-block;
-    border: 3px solid #444;
+    border: var(--grid-border);
     background-color: #ffffff;
-    padding: 5px;
+    padding: var(--grid-padding);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    margin-bottom: 25px;
 }
 
-/* Basic cell styling with smooth transition */
+.grid-row {
+    display: flex;
+}
+
 .grid-cell {
-    width: 30px;
-    height: 30px;
-    border: 1px solid #666;
-    display: inline-flex;
+    width: var(--cell-size);
+    height: var(--cell-size);
+    border: var(--cell-border);
+    display: flex;
     justify-content: center;
     align-items: center;
     font-size: 1.2em;
     font-weight: bold;
     cursor: pointer;
-    color: #333;
-    background-color: #333;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    color: var(--color-text);
+    background-color: var(--color-black-cell);
+    transition: background-color var(--transition-duration) ease, color var(--transition-duration) ease;
 }
 
-/* Styling for blacked-out cells */
-.black-cell {
-    background-color: #333;
-    color: #333; /* Hide text in black cells */
+.grid-cell.white-cell {
+    background-color: var(--color-white-cell);
+    color: var(--color-text);
 }
 
-/* Styling for white cells */
-.white-cell {
-    background-color: #f8f9fa;
+.grid-cell.black-cell {
+    background-color: var(--color-black-cell);
+    color: var(--color-black-cell); /* Hide text in black cells */
+    cursor: default;
+}
+
+.grid-cell.prefilled-cell {
+    background-color: var(--color-white-cell);
     color: #444;
+    cursor: default;
 }
 
-/* Highlight solved cells for a clear distinction */
-.solved-cell {
-    background-color: #d1e7dd;
-    color: #155724;
+.grid-cell.numbered-cell {
+    position: relative;
+}
+
+.grid-cell.numbered-cell::before {
+    content: attr(data-number);
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font-size: 0.6em;
+    color: #000;
+}
+
+.grid-cell.solved-cell {
+    background-color: var(--color-solved-cell-bg);
+    color: var(--color-solved-cell-text);
     font-weight: bold;
-    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Smooth color transition on cell toggle */
-.grid-cell:hover {
+/* Focus States for Accessibility */
+.grid-cell:focus {
+    outline: 2px solid var(--color-button);
+}
+
+/* Hover States */
+.grid-cell.white-cell:hover {
     background-color: #ddd;
     color: #222;
 }
 
-/* Styling for grid rows */
-.grid-row {
-    display: flex;
+.grid-cell.solved-cell:hover {
+    background-color: var(--color-solved-cell-bg);
+    color: var(--color-solved-cell-text);
 }
 
-/* Button styling updates */
-button {
-    padding: 10px 20px;
-    margin: 5px;
-    background-color: #0069d9;
-    color: #ffffff;
-    cursor: pointer;
-    border-radius: 5px;
-    font-weight: 500;
-    transition: background-color 0.2s, transform 0.1s;
-    text-align: center;
-}
-
-button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-}
-
-button:hover {
-    background-color: #0056b3;
-    transform: scale(1.05);
-}
-
-button:active {
-    transform: scale(1);
-}
-
-/* Stop button styling for easy identification */
-#stopNumberEntryButton {
-    background-color: #dc3545;
-}
-
-#stopNumberEntryButton:hover {
-    background-color: #c82333;
-}
-
-/* Word List Section Styling */
-#word-list {
-    margin-top: 20px;
-    width: 85%;
-    text-align: left;
-    color: #333;
-}
-
-/* Result display styling */
-#result {
-    font-size: 1.1em;
-    line-height: 1.6;
-    color: #222;
-    white-space: pre-line;
-    margin-top: 15px;
-    padding: 15px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    width: 85%;
-}
-
-/* Word list headings for "Across" and "Down" */
-#word-list h3 {
-    font-size: 1.3em;
-    color: #333;
-    margin-bottom: 10px;
-    font-weight: 500;
-    border-bottom: 2px solid #ccc;
-    padding-bottom: 5px;
-    margin-top: 15px;
-}
-
-/* Styling for controls container */
-#controls {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background-color: #ffffff;
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-}
-
-/* Add smooth transition to cell coloring */
-.grid-cell {
-    transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-/* Additional responsive adjustments */
-@media (max-width: 600px) {
-    h1 {
-        font-size: 1.8em;
-    }
-    #result {
-        width: 100%;
-        font-size: 1em;
-    }
-    button {
-        font-size: 0.9em;
-        padding: 8px 15px;
-    }
-    #gridContainer {
-        transform: scale(0.9);
-    }
-    #predefinedPuzzles button {
-        font-size: 0.9em;
-        padding: 8px 15px;
-    }
-}
-
-/* Loading spinner */
+/* Spinner Styling */
 .spinner {
     border: 4px solid rgba(0, 0, 0, 0.1);
-    border-left-color: #0069d9;
+    border-left-color: var(--color-button);
     border-radius: 50%;
     width: 24px;
     height: 24px;
@@ -217,34 +267,128 @@ button:active {
     to { transform: rotate(360deg); }
 }
 
-/* Styling for predefined puzzles section */
-#predefinedPuzzles {
-    margin-bottom: 20px;
-    text-align: center;
+/* Word List Section Styling */
+#wordList {
+    margin-top: var(--spacing-large);
+    width: 85%;
+    text-align: left;
+    color: var(--color-text);
 }
 
-#predefinedPuzzles h2 {
-    margin-bottom: 10px;
-    font-size: 1.5em;
-}
-
-#predefinedPuzzles button {
-    padding: 10px 20px;
-    margin: 5px;
-    background-color: #17a2b8;
-    color: #ffffff;
-    border: none;
-    cursor: pointer;
-    border-radius: 5px;
+#wordList h3 {
+    font-size: 1.3em;
+    color: var(--color-text);
+    margin-bottom: var(--spacing-small);
     font-weight: 500;
-    transition: background-color 0.2s, transform 0.1s;
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 5px;
+    margin-top: 15px;
 }
 
-#predefinedPuzzles button:hover {
-    background-color: #138496;
-    transform: scale(1.05);
+#result {
+    font-size: var(--font-size-small);
+    line-height: 1.6;
+    color: var(--color-text);
+    white-space: pre-line;
+    margin-top: 15px;
+    padding: var(--spacing-small);
+    background-color: var(--color-white-cell);
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 100%;
 }
 
-#predefinedPuzzles button:active {
-    transform: scale(1);
+/* Notification Area Styling */
+#notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: var(--z-index-notification);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-small);
+}
+
+.notification {
+    padding: var(--spacing-small);
+    border-radius: 5px;
+    color: #ffffff;
+    min-width: 200px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    opacity: 0.95;
+    font-size: var(--font-size-small);
+    animation: fadeIn 0.5s, fadeOut 0.5s 4.5s;
+}
+
+.notification.info {
+    background-color: var(--color-notification-info);
+}
+
+.notification.warning {
+    background-color: var(--color-notification-warning);
+}
+
+.notification.error {
+    background-color: var(--color-notification-error);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 0.95; transform: translateY(0); }
+}
+
+@keyframes fadeOut {
+    from { opacity: 0.95; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-10px); }
+}
+
+/* Responsive Design */
+@media (max-width: 800px) {
+    body {
+        padding: var(--spacing-medium);
+    }
+
+    #gridContainer {
+        transform: scale(0.9);
+    }
+
+    .grid-cell {
+        width: 25px;
+        height: 25px;
+        font-size: 1em;
+    }
+
+    #wordList {
+        width: 100%;
+    }
+}
+
+@media (max-width: 600px) {
+    h1 {
+        font-size: 1.8em;
+    }
+
+    #wordList {
+        font-size: 1em;
+    }
+
+    button {
+        font-size: 0.9em;
+        padding: 8px 15px;
+    }
+
+    #gridContainer {
+        transform: scale(0.8);
+    }
+
+    #predefinedPuzzles button {
+        font-size: 0.9em;
+        padding: 8px 15px;
+    }
+
+    .grid-cell {
+        width: 20px;
+        height: 20px;
+        font-size: 0.9em;
+    }
 }
